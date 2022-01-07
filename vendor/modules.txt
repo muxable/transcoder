@@ -5,8 +5,6 @@ github.com/golang/protobuf/ptypes
 github.com/golang/protobuf/ptypes/any
 github.com/golang/protobuf/ptypes/duration
 github.com/golang/protobuf/ptypes/timestamp
-# github.com/google/go-cmp v0.5.6
-## explicit; go 1.8
 # github.com/google/uuid v1.3.0
 ## explicit
 github.com/google/uuid
@@ -45,6 +43,10 @@ github.com/pion/interceptor
 github.com/pion/interceptor/pkg/nack
 github.com/pion/interceptor/pkg/report
 github.com/pion/interceptor/pkg/twcc
+# github.com/pion/ion-sdk-go v0.7.0
+## explicit; go 1.16
+github.com/pion/ion-sdk-go/pkg/gstreamer-sink
+github.com/pion/ion-sdk-go/pkg/gstreamer-src
 # github.com/pion/logging v0.2.2
 ## explicit; go 1.12
 github.com/pion/logging
@@ -100,8 +102,6 @@ github.com/pion/webrtc/v3/internal/mux
 github.com/pion/webrtc/v3/internal/util
 github.com/pion/webrtc/v3/pkg/media
 github.com/pion/webrtc/v3/pkg/rtcerr
-# github.com/pkg/errors v0.9.1
-## explicit
 # go.uber.org/atomic v1.7.0
 ## explicit; go 1.13
 go.uber.org/atomic

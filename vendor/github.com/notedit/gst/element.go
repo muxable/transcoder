@@ -46,20 +46,20 @@ const (
 type SeekFlags int
 
 const (
-	SeekFlagNone              SeekFlags = C.GST_SEEK_FLAG_NONE
-	SeekFlagFlush             SeekFlags = C.GST_SEEK_FLAG_FLUSH
-	SeekFlagAccurate          SeekFlags = C.GST_SEEK_FLAG_ACCURATE
-	SeekFlagKeyUnit           SeekFlags = C.GST_SEEK_FLAG_KEY_UNIT
-	SeekFlagSegment           SeekFlags = C.GST_SEEK_FLAG_SEGMENT
-	SeekFlagTrickmode         SeekFlags = C.GST_SEEK_FLAG_TRICKMODE
-	SeekFlagSkip              SeekFlags = C.GST_SEEK_FLAG_SKIP
-	SeekFlagSnapBefore        SeekFlags = C.GST_SEEK_FLAG_SNAP_BEFORE
-	SeekFlagSnapAfter         SeekFlags = C.GST_SEEK_FLAG_SNAP_AFTER
-	SeekFlagSnapNearest       SeekFlags = C.GST_SEEK_FLAG_SNAP_NEAREST
-	SeekFlagTrickmodeKeyUnits SeekFlags = C.GST_SEEK_FLAG_TRICKMODE_KEY_UNITS
-	SeekFlagTrickmodeNoAudio  SeekFlags = C.GST_SEEK_FLAG_TRICKMODE_NO_AUDIO
-	// SeekFlagTrickmodeForwardPredicted SeekFlags = C.GST_SEEK_FLAG_TRICKMODE_FORWARD_PREDICTED
-	// SeekFlagInstantRateChange         SeekFlags = C.GST_SEEK_FLAG_INSTANT_RATE_CHANGE
+	SeekFlagNone                      SeekFlags = C.GST_SEEK_FLAG_NONE
+	SeekFlagFlush                     SeekFlags = C.GST_SEEK_FLAG_FLUSH
+	SeekFlagAccurate                  SeekFlags = C.GST_SEEK_FLAG_ACCURATE
+	SeekFlagKeyUnit                   SeekFlags = C.GST_SEEK_FLAG_KEY_UNIT
+	SeekFlagSegment                   SeekFlags = C.GST_SEEK_FLAG_SEGMENT
+	SeekFlagTrickmode                 SeekFlags = C.GST_SEEK_FLAG_TRICKMODE
+	SeekFlagSkip                      SeekFlags = C.GST_SEEK_FLAG_SKIP
+	SeekFlagSnapBefore                SeekFlags = C.GST_SEEK_FLAG_SNAP_BEFORE
+	SeekFlagSnapAfter                 SeekFlags = C.GST_SEEK_FLAG_SNAP_AFTER
+	SeekFlagSnapNearest               SeekFlags = C.GST_SEEK_FLAG_SNAP_NEAREST
+	SeekFlagTrickmodeKeyUnits         SeekFlags = C.GST_SEEK_FLAG_TRICKMODE_KEY_UNITS
+	SeekFlagTrickmodeNoAudio          SeekFlags = C.GST_SEEK_FLAG_TRICKMODE_NO_AUDIO
+	SeekFlagTrickmodeForwardPredicted SeekFlags = C.GST_SEEK_FLAG_TRICKMODE_FORWARD_PREDICTED
+	SeekFlagInstantRateChange         SeekFlags = C.GST_SEEK_FLAG_INSTANT_RATE_CHANGE
 )
 
 type Element struct {

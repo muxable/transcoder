@@ -5,8 +5,8 @@ import (
 	"strings"
 
 	"github.com/muxable/transcoder/pkg"
-	gst_sink "github.com/muxable/transcoder/test/gstreamer-sink"
-	gst_src "github.com/muxable/transcoder/test/gstreamer-src"
+	gst_sink "github.com/pion/ion-sdk-go/pkg/gstreamer-sink"
+	gst_src "github.com/pion/ion-sdk-go/pkg/gstreamer-src"
 	"github.com/pion/webrtc/v3"
 	"go.uber.org/zap"
 )
@@ -29,7 +29,7 @@ func main() {
 		panic(audioTrackErr)
 	}
 
-	client, err := pkg.NewTranscoderClient("localhost:50051")
+	client, err := pkg.NewTranscoderClient("127.0.0.1:50051")
 	if err != nil {
 		panic(err)
 	}
