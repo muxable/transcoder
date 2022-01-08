@@ -1,7 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"net"
+	"os"
 
 	transcoder "github.com/muxable/transcoder/api"
 	"github.com/muxable/transcoder/internal"
@@ -21,7 +23,12 @@ func main() {
 	undo := zap.ReplaceGlobals(logger)
 	defer undo()
 
-	lis, err := net.Listen("tcp", "localhost:50051")
+	port := os.Getenv("PORT")
+	if port == "" {
+			port = "50051"
+	}
+	
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%s", port))
 	if err != nil {
 		panic(err)
 	}
