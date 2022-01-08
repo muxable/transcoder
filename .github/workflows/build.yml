@@ -67,7 +67,7 @@ jobs:
         uses: akhilerm/tag-push-action@v2.0.0
         with:
           src: ghcr.io/${{ github.repository }}:latest
-          dst: us-docker.pkg.dev/mediatunnel-325914/transcoder:latest
+          dst: us-docker.pkg.dev/mediatunnel-325914/transcoder/server:latest
           
       - uses: google-github-actions/auth@v0
         with:
@@ -80,7 +80,7 @@ jobs:
         id: deploy
         run: |
           gcloud run deploy transcoder \
-            --image us-docker.pkg.dev/mediatunnel-325914/transcoder:latest \
+            --image us-docker.pkg.dev/mediatunnel-325914/transcoder/server:latest \
             --quiet \
             --platform managed \
             --region us-west4 \
