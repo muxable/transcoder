@@ -24,4 +24,6 @@ COPY . ./
 
 RUN go build -v -o /transcoder cmd/main.go
 
+ENV APP_ENV=production
+
 CMD [ "/transcoder" ]
