@@ -3,6 +3,7 @@ module github.com/muxable/transcoder
 go 1.17
 
 require (
+	github.com/blendle/zapdriver v1.3.1
 	github.com/notedit/gst v0.0.9
 	github.com/pion/ion-sdk-go v0.7.0
 	google.golang.org/grpc v1.43.0
@@ -27,7 +28,7 @@ require (
 	github.com/pion/mdns v0.0.5 // indirect
 	github.com/pion/randutil v0.1.0 // indirect
 	github.com/pion/rtcp v1.2.9
-	github.com/pion/rtp v1.7.4 // indirect
+	github.com/pion/rtp v1.7.4
 	github.com/pion/sctp v1.8.2 // indirect
 	github.com/pion/sdp/v3 v3.0.4 // indirect
 	github.com/pion/srtp/v2 v2.0.5 // indirect

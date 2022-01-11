@@ -5,6 +5,7 @@ import (
 	"net"
 	"os"
 
+	"github.com/blendle/zapdriver"
 	transcoder "github.com/muxable/transcoder/api"
 	"github.com/muxable/transcoder/internal"
 	"github.com/pion/webrtc/v3"
@@ -14,8 +15,16 @@ import (
 	"google.golang.org/grpc/health/grpc_health_v1"
 )
 
+func logger() (*zap.Logger, error) {
+	if os.Getenv("APP_ENV") == "production" {
+		return zapdriver.NewProduction()
+	} else {
+		return zap.NewDevelopment()
+	}
+}
+
 func main() {
-	logger, err := zap.NewDevelopment()
+	logger, err := logger()
 	if err != nil {
 		panic(err)
 	}
