@@ -4,7 +4,7 @@ This package implements a transcoding server. It accepts WebRTC signalled over g
 
 ## Client SDK
 
-For convenience if you don't want to deal with signalling, a lightweight client SDK is provided.
+For convenience if you don't want to deal with signalling and reconnection semantics, a lightweight client SDK is provided.
 
 ### Example usage
 
