@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 
 	transcoder "github.com/muxable/transcoder/api"
-	"github.com/pion/interceptor"
 	"github.com/pion/webrtc/v3"
 	"go.uber.org/zap"
 )
@@ -17,25 +16,7 @@ type TranscoderServer struct {
 }
 
 func (s *TranscoderServer) Signal(conn transcoder.Transcoder_SignalServer) error {
-	m := &webrtc.MediaEngine{}
-	if err := m.RegisterDefaultCodecs(); err != nil {
-		return err
-	}
-	
-	// signal support for h265 until pion supports it.
-	if err := m.RegisterCodec(webrtc.RTPCodecParameters{
-		RTPCodecCapability: webrtc.RTPCodecCapability{"video/h265", 90000, 0, "", []webrtc.RTCPFeedback{{"goog-remb", ""}, {"ccm", "fir"}, {"nack", ""}, {"nack", "pli"}}},
-		PayloadType:        103,
-	}, webrtc.RTPCodecTypeVideo); err != nil {
-		return err
-	}
-
-	i := &interceptor.Registry{}
-	if err := webrtc.RegisterDefaultInterceptors(m, i); err != nil {
-		return err
-	}
-
-	peerConnection, err := webrtc.NewAPI(webrtc.WithMediaEngine(m), webrtc.WithInterceptorRegistry(i)).NewPeerConnection(s.Configuration)
+	peerConnection, err := NewPeerConnection(s.Configuration)
 	if err != nil {
 		return err
 	}
