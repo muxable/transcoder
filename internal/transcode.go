@@ -8,11 +8,9 @@ package internal
 import "C"
 import (
 	"fmt"
-	"log"
-	"time"
+	"io"
 
 	"github.com/notedit/gst"
-	"github.com/pion/rtcp"
 	"github.com/pion/rtp"
 	"github.com/pion/rtp/codecs"
 	"github.com/pion/webrtc/v3"
@@ -83,14 +81,10 @@ func NewPipeline(codec webrtc.RTPCodecParameters) (*gst.Bin, error) {
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("pipeline: %s", pipelineStr)
-
 	return gst.ParseBinFromDescription(pipelineStr, false)
 }
 
 func TranscodePeerConnection(pc *webrtc.PeerConnection) error {
-	// start a new gstreamer pipeline.
-	// the audio pipeline is a passthrough pipeline but we must pass it through gst for synchronization.
 	pipeline, err := gst.PipelineNew("transcode")
 	if err != nil {
 		return err
@@ -101,16 +95,6 @@ func TranscodePeerConnection(pc *webrtc.PeerConnection) error {
 	pc.OnTrack(func(tr *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) {
 		zap.L().Debug("OnTrack", zap.String("kind", tr.Kind().String()), zap.Uint8("payloadType",
 			uint8(tr.Codec().PayloadType)))
-
-		go func() {
-			ticker := time.NewTicker(time.Second * 3)
-			for range ticker.C {
-				rtcpSendErr := pc.WriteRTCP([]rtcp.Packet{&rtcp.PictureLossIndication{MediaSSRC: uint32(tr.SSRC())}})
-				if rtcpSendErr != nil {
-					fmt.Println(rtcpSendErr)
-				}
-			}
-		}()
 
 		targetCodec, payloader, err := TargetCodec(tr.Codec().RTPCodecCapability)
 		if err != nil {
@@ -149,8 +133,13 @@ func TranscodePeerConnection(pc *webrtc.PeerConnection) error {
 			for source != nil {
 				i, _, err := tr.Read(buf)
 				if err != nil {
+					if err == io.EOF {
+						if err := source.EndOfStream(); err != nil {
+							zap.L().Error("could not end of stream", zap.Error(err))
+						}
+						return
+					}
 					zap.L().Error("could not read rtp", zap.Error(err))
-					bin.SetState(gst.StateNull)
 					return
 				}
 				if err := source.PushBuffer(buf[:i]); err != nil {
