@@ -81,18 +81,7 @@ jobs:
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v0
 
-      - name: Deploy to Cloud Run
+      - name: Deploy to GCE
         id: deploy
         run: |
-          gcloud run deploy transcoder \
-            --image us-docker.pkg.dev/mediatunnel-325914/transcoder/server:latest \
-            --quiet \
-            --platform managed \
-            --region us-west4 \
-            --format json
-
-      - name: Switchover traffic
-        run: |
-          gcloud run services update-traffic transcoder \
-            --region us-west4 \
-            --to-latest
+          gcloud compute instance-groups managed rolling-action start-update transcoder --version=template=transcoder
