@@ -18,7 +18,7 @@ type TranscoderServer struct {
 func (s *TranscoderServer) Signal(conn transcoder.Transcoder_SignalServer) error {
 	peerConnection, err := webrtc.NewPeerConnection(s.Configuration)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	defer peerConnection.Close()
