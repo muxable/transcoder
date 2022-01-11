@@ -90,6 +90,7 @@ func NewTranscoderAPIClient(conn *grpc.ClientConn) (*TranscoderClient, error) {
 	})
 
 	go func() {
+		defer peerConnection.Close()
 		for {
 			in, err := client.Recv()
 			if err != nil {
