@@ -1,4 +1,4 @@
-# trancoder
+# muxable/transcoder
 
 This package implements a transcoding server. It accepts WebRTC signalled over gRPC and will respond with a transcoded track for each received track.
 
@@ -32,3 +32,7 @@ if err != nil {
 ```
 
 Here, `client.Transcode()` accepts a `TrackLocal` and returns a `TrackRemote`.
+
+## Cloud hosting
+
+If you are interested in using this service pre-deployed, please email kevin@muxable.com.
