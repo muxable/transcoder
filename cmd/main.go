@@ -27,8 +27,10 @@ func main() {
 	if port == "" {
 			port = "50051"
 	}
+
+	addr := fmt.Sprintf(":%s", port)
 	
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%s", port))
+	lis, err := net.Listen("tcp", addr)
 	if err != nil {
 		panic(err)
 	}
@@ -48,6 +50,8 @@ func main() {
 		},
 	})
 	grpc_health_v1.RegisterHealthServer(s, health.NewServer())
+
+	zap.L().Info("starting transcoder server", zap.String("addr", addr))
 
 	if err := s.Serve(lis); err != nil {
 		panic(err)
