@@ -1,4 +1,4 @@
-name: Docker
+name: Build and Deploy
 
 on:
   push:
@@ -11,7 +11,7 @@ on:
       - 'main'
 
 jobs:
-  docker:
+  build:
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -21,23 +21,26 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v2
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
       - name: Log in to the Container registry
         uses: docker/login-action@v1
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-          tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v3
         with:
           images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v2
@@ -46,3 +49,50 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    needs: build
+    concurrency:
+      group: deploy
+      cancel-in-progress: true
+
+    steps:
+      - name: Log in to the Container registry
+        uses: docker/login-action@v1
+        with:
+          registry: us-docker.pkg.dev
+          username: _json_key
+          password: ${{ secrets.TRANSCODER_SERVICE_ACCOUNT_JSON }}
+          
+      - name: Push image
+        uses: akhilerm/tag-push-action@v2.0.0
+        with:
+          src: ghcr.io/${{ github.repository }}:latest
+          dst: us-docker.pkg.dev/mediatunnel-325914/transcoder/server:latest
+          
+      - uses: google-github-actions/auth@v0
+        with:
+          credentials_json: ${{ secrets.TRANSCODER_SERVICE_ACCOUNT_JSON }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v0
+
+      - name: Deploy to Cloud Run
+        id: deploy
+        run: |
+          gcloud run deploy transcoder \
+            --image us-docker.pkg.dev/mediatunnel-325914/transcoder/server:latest \
+            --quiet \
+            --platform managed \
+            --region us-west4 \
+            --format json
+
+      - name: Switchover traffic
+        run: |
+          gcloud run services update-traffic transcoder \
+            --region us-west4 \
+            --to-latest
