@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"sync"
 
 	transcoder "github.com/muxable/transcoder/api"
@@ -159,18 +158,14 @@ func NewTranscoderClient(via string) (*TranscoderClient, error) {
 }
 
 func (c *TranscoderClient) Transcode(tl webrtc.TrackLocal) (*webrtc.TrackRemote, error) {
-	c.Lock()
-
 	if _, err := c.peerConnection.AddTrack(tl); err != nil {
 		return nil, err
 	}
 
+	c.Lock()
 	promise := make(chan *webrtc.TrackRemote)
 	c.promises[tl.ID()] = promise
-
 	c.Unlock()
-
-	log.Printf("waiting for promise")
 
 	return <-promise, nil
 }
