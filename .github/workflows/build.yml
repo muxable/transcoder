@@ -84,4 +84,4 @@ jobs:
       - name: Deploy to GCE
         id: deploy
         run: |
-          gcloud compute instance-groups managed rolling-action start-update transcoder --version=template=transcoder
+          gcloud compute instance-groups managed rolling-action start-update transcoder --version=template=transcoder --region=us-east4
