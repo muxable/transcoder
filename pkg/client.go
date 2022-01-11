@@ -10,7 +10,6 @@ import (
 	"github.com/pion/webrtc/v3"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 type TranscoderClient struct {
@@ -21,17 +20,12 @@ type TranscoderClient struct {
 	promises       map[string]chan *webrtc.TrackRemote
 }
 
-func NewTranscoderClient(via string) (*TranscoderClient, error) {
+func NewTranscoderAPIClient(conn *grpc.ClientConn) (*TranscoderClient, error) {
 	peerConnection, err := webrtc.NewPeerConnection(webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{
 			{URLs: []string{"stun:stun.l.google.com:19302"}},
 		},
 	})
-	if err != nil {
-		return nil, err
-	}
-
-	conn, err := grpc.Dial(via, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return nil, err
 	}
