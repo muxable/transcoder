@@ -61,19 +61,6 @@ jobs:
       cancel-in-progress: true
 
     steps:
-      - name: Log in to the Container registry
-        uses: docker/login-action@v1
-        with:
-          registry: us-docker.pkg.dev
-          username: _json_key
-          password: ${{ secrets.TRANSCODER_SERVICE_ACCOUNT_JSON }}
-          
-      - name: Push image
-        uses: akhilerm/tag-push-action@v2.0.0
-        with:
-          src: ghcr.io/${{ github.repository }}:main
-          dst: us-docker.pkg.dev/mediatunnel-325914/transcoder/server:latest
-          
       - uses: google-github-actions/auth@v0
         with:
           credentials_json: ${{ secrets.TRANSCODER_SERVICE_ACCOUNT_JSON }}
@@ -84,4 +71,4 @@ jobs:
       - name: Deploy to GCE
         id: deploy
         run: |
-          gcloud compute instance-groups managed rolling-action start-update transcoder --version=template=transcoder-e2-highcpu-4 --region=us-east4
+          gcloud compute instance-groups managed rolling-action start-update transcoder --version=template=transcoder --region=us-east4
