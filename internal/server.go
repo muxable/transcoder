@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 
 	transcoder "github.com/muxable/transcoder/api"
+	"github.com/muxable/transcoder/pkg"
 	"github.com/pion/webrtc/v3"
 	"go.uber.org/zap"
 )
@@ -16,7 +17,7 @@ type TranscoderServer struct {
 }
 
 func (s *TranscoderServer) Signal(conn transcoder.Transcoder_SignalServer) error {
-	peerConnection, err := NewPeerConnection(s.Configuration)
+	peerConnection, err := pkg.NewTranscoderPeerConnection(s.Configuration)
 	if err != nil {
 		return err
 	}

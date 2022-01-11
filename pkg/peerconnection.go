@@ -1,12 +1,12 @@
-package internal
+package pkg
 
 import (
 	"github.com/pion/interceptor"
 	"github.com/pion/webrtc/v3"
 )
 
-// NewPeerConnection creates a new PeerConnection with additional video types supported.
-func NewPeerConnection(configuration webrtc.Configuration) (*webrtc.PeerConnection, error) {
+// NewTranscoderPeerConnection creates a new PeerConnection with additional video types supported.
+func NewTranscoderPeerConnection(configuration webrtc.Configuration) (*webrtc.PeerConnection, error) {
 	m := &webrtc.MediaEngine{}
 	if err := m.RegisterDefaultCodecs(); err != nil {
 		return nil, err
