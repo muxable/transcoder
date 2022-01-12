@@ -20,7 +20,7 @@ import (
 func ToRTPCaps(codec webrtc.RTPCodecParameters) string {
 	switch codec.MimeType {
 	// video codecs
-	case "video/h265":
+	case "video/H265":
 		return fmt.Sprintf("application/x-rtp,media=(string)video,clock-rate=(int)%d,encoding-name=(string)H265,payload=(int)%d", codec.ClockRate, codec.PayloadType)
 	case webrtc.MimeTypeH264:
 		return fmt.Sprintf("application/x-rtp,media=(string)video,clock-rate=(int)%d,encoding-name=(string)H264,payload=(int)%d", codec.ClockRate, codec.PayloadType)
@@ -47,7 +47,7 @@ func PipelineString(codec webrtc.RTPCodecParameters) (string, error) {
 
 	switch codec.MimeType {
 	// video codecs
-	case "video/h265":
+	case "video/H265":
 		return appsrc + ` ! rtph265depay ! decodebin ! queue ! videoconvert ! x264enc speed-preset=ultrafast tune=zerolatency key-int-max=20 ! ` + appsink, nil
 	case webrtc.MimeTypeH264:
 		return appsrc + ` ! rtph264depay ! ` + appsink, nil
@@ -68,7 +68,7 @@ func PipelineString(codec webrtc.RTPCodecParameters) (string, error) {
 
 func TargetCodec(codec webrtc.RTPCodecCapability) (*webrtc.RTPCodecCapability, rtp.Payloader, error) {
 	switch codec.MimeType {
-	case "video/h265", webrtc.MimeTypeH264, webrtc.MimeTypeVP8, webrtc.MimeTypeVP9:
+	case "video/H265", webrtc.MimeTypeH264, webrtc.MimeTypeVP8, webrtc.MimeTypeVP9:
 		return &webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeH264, ClockRate: 90000}, &codecs.H264Payloader{}, nil
 	case webrtc.MimeTypeOpus, "audio/aac", webrtc.MimeTypeG722:
 		return &webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeOpus, ClockRate: 48000}, &codecs.OpusPayloader{}, nil
