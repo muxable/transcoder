@@ -9,6 +9,8 @@ import (
 	gst_src "github.com/pion/ion-sdk-go/pkg/gstreamer-src"
 	"github.com/pion/webrtc/v3"
 	"go.uber.org/zap"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 func main() {
@@ -19,17 +21,22 @@ func main() {
 	zap.ReplaceGlobals(logger)
 
 	// create tracks
-	videoTrack, videoTrackErr := webrtc.NewTrackLocalStaticSample(webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeH264}, "video", "pion")
-	if videoTrackErr != nil {
-		panic(videoTrackErr)
+	videoTrack, err := webrtc.NewTrackLocalStaticSample(webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeH264}, "video", "pion")
+	if err != nil {
+		panic(err)
 	}
 
-	audioTrack, audioTrackErr := webrtc.NewTrackLocalStaticSample(webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeOpus}, "audio", "pion")
-	if audioTrackErr != nil {
-		panic(audioTrackErr)
+	audioTrack, err := webrtc.NewTrackLocalStaticSample(webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeOpus}, "audio", "pion")
+	if err != nil {
+		panic(err)
 	}
 
-	client, err := pkg.NewTranscoderClient("127.0.0.1:50051")
+	conn, err := grpc.Dial("127.0.0.1:50051", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		panic(err)
+	}
+
+	client, err := pkg.NewTranscoderAPIClient(conn)
 	if err != nil {
 		panic(err)
 	}
