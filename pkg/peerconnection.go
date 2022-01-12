@@ -14,15 +14,21 @@ func NewTranscoderPeerConnection(configuration webrtc.Configuration) (*webrtc.Pe
 
 	// signal support for h265 until pion supports it.
 	if err := m.RegisterCodec(webrtc.RTPCodecParameters{
-		RTPCodecCapability: webrtc.RTPCodecCapability{"video/h265", 90000, 0, "", []webrtc.RTCPFeedback{{"goog-remb", ""}, {"ccm", "fir"}, {"nack", ""}, {"nack", "pli"}}},
-		PayloadType:        103,
+		RTPCodecCapability: webrtc.RTPCodecCapability{
+			MimeType:     "video/H265",
+			ClockRate:    90000,
+			Channels:     0,
+			SDPFmtpLine:  "",
+			RTCPFeedback: []webrtc.RTCPFeedback{{Type: "goog-remb", Parameter: ""}, {Type: "ccm", Parameter: "fir"}, {Type: "nack", Parameter: ""}, {Type: "nack", Parameter: "pli"}},
+		},
+		PayloadType: 103,
 	}, webrtc.RTPCodecTypeVideo); err != nil {
-		return nil,  err
+		return nil, err
 	}
 
 	i := &interceptor.Registry{}
 	if err := webrtc.RegisterDefaultInterceptors(m, i); err != nil {
-		return nil,  err
+		return nil, err
 	}
 
 	return webrtc.NewAPI(webrtc.WithMediaEngine(m), webrtc.WithInterceptorRegistry(i)).NewPeerConnection(configuration)
