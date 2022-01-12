@@ -110,10 +110,20 @@ func TranscodePeerConnection(pc *webrtc.PeerConnection) error {
 			return
 		}
 
-		if _, err := pc.AddTrack(tl); err != nil {
+		rtpSender, err := pc.AddTrack(tl)
+		if err != nil {
 			zap.L().Error("could not add track", zap.Error(err))
 			return
 		}
+		
+		go func() {
+			buf := make([]byte, 1500)
+			for {
+				if _, _, err := rtpSender.Read(buf); err != nil {
+					return
+				}
+			}
+		}()
 
 		bin, err := NewPipeline(tr.Codec())
 		if err != nil {
