@@ -81,6 +81,15 @@ func NewTranscoderAPIClient(conn *grpc.ClientConn) (*TranscoderClient, error) {
 		c.Lock()
 		defer c.Unlock()
 
+		go func() {
+			buf := make([]byte, 1500)
+			for {
+				if _, _, err := r.Read(buf); err != nil {
+					return
+				}
+			}
+		}()
+
 		if promise, ok := c.promises[tr.ID()]; ok {
 			promise <- tr
 			delete(c.promises, tr.ID())

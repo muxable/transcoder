@@ -96,6 +96,15 @@ func TranscodePeerConnection(pc *webrtc.PeerConnection) error {
 		zap.L().Debug("OnTrack", zap.String("kind", tr.Kind().String()), zap.Uint8("payloadType",
 			uint8(tr.Codec().PayloadType)))
 
+		go func() {
+			buf := make([]byte, 1500)
+			for {
+				if _, _, err := receiver.Read(buf); err != nil {
+					return
+				}
+			}
+		}()
+
 		targetCodec, payloader, err := TargetCodec(tr.Codec().RTPCodecCapability)
 		if err != nil {
 			zap.L().Error("could not determine target codec", zap.Error(err))
