@@ -153,9 +153,19 @@ func NewTranscoderAPIClient(conn *grpc.ClientConn) (*TranscoderClient, error) {
 }
 
 func (c *TranscoderClient) Transcode(tl webrtc.TrackLocal) (*webrtc.TrackRemote, error) {
-	if _, err := c.peerConnection.AddTrack(tl); err != nil {
+	rtpSender, err := c.peerConnection.AddTrack(tl)
+	if err != nil {
 		return nil, err
 	}
+	
+	go func() {
+		buf := make([]byte, 1500)
+		for {
+			if _, _, err := rtpSender.Read(buf); err != nil {
+				return
+			}
+		}
+	}()
 
 	c.Lock()
 	promise := make(chan *webrtc.TrackRemote)
