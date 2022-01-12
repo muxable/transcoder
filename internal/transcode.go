@@ -50,14 +50,14 @@ func PipelineString(codec webrtc.RTPCodecParameters) (string, error) {
 	case "video/h265":
 		return appsrc + ` ! rtph265depay ! decodebin ! queue ! videoconvert ! x264enc speed-preset=ultrafast tune=zerolatency key-int-max=20 ! ` + appsink, nil
 	case webrtc.MimeTypeH264:
-		return appsrc + ` ! rtph264depay ! decodebin ! queue ! videoconvert ! x264enc speed-preset=ultrafast tune=zerolatency key-int-max=20 ! ` + appsink, nil
+		return appsrc + ` ! rtph264depay ! ` + appsink, nil
 	case webrtc.MimeTypeVP8:
 		return appsrc + ` ! rtpvp8depay ! decodebin ! queue ! videoconvert ! x264enc speed-preset=ultrafast tune=zerolatency key-int-max=20 ! ` + appsink, nil
 	case webrtc.MimeTypeVP9:
 		return appsrc + ` ! rtpvp9depay ! decodebin ! queue ! videoconvert ! x264enc speed-preset=ultrafast tune=zerolatency key-int-max=20 ! ` + appsink, nil
 	// audio codecs
 	case webrtc.MimeTypeOpus:
-		return appsrc + ` ! rtpopusdepay ! decodebin ! queue ! audioconvert ! opusenc ! ` + appsink, nil
+		return appsrc + ` ! rtpopusdepay ! ` + appsink, nil
 	case "audio/aac":
 		return appsrc + ` ! rtpmp4adepay ! decodebin ! queue ! audioconvert ! opusenc ! ` + appsink, nil
 	case webrtc.MimeTypeG722:
