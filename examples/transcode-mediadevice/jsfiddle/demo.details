@@ -1,0 +1,5 @@
+---
+ name: transcoder
+ description: Example of how to transcode tracks with a WebRTC transcoding server.
+ authors:
+   - Kevin Wang <kevin@muxable.com>

@@ -46,18 +46,11 @@ func main() {
 
 	s := grpc.NewServer()
 
-	transcoder.RegisterTranscoderServer(s, &internal.TranscoderServer{
-		Configuration: webrtc.Configuration{
-			ICEServers: []webrtc.ICEServer{
-				{URLs: []string{"stun:stun.l.google.com:19302"}},
-			},
+	transcoder.RegisterTranscoderServer(s, internal.NewTranscoderServer(webrtc.Configuration{
+		ICEServers: []webrtc.ICEServer{
+			{URLs: []string{"stun:stun.l.google.com:19302"}},
 		},
-		OnPeerConnection: func(pc *webrtc.PeerConnection) {
-			if err := internal.TranscodePeerConnection(pc); err != nil {
-				zap.L().Error("failed to transcode", zap.Error(err))
-			}
-		},
-	})
+	}))
 	grpc_health_v1.RegisterHealthServer(s, health.NewServer())
 
 	zap.L().Info("starting transcoder server", zap.String("addr", addr))

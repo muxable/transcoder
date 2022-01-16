@@ -1,4 +1,4 @@
-package pkg
+package transcoder
 
 import (
 	"context"
@@ -6,22 +6,23 @@ import (
 	"fmt"
 	"sync"
 
-	transcoder "github.com/muxable/transcoder/api"
+	"github.com/muxable/transcoder/api"
 	"github.com/pion/webrtc/v3"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 )
 
-type TranscoderClient struct {
+type Client struct {
 	sync.Mutex
 
+	ctx            context.Context
 	peerConnection *webrtc.PeerConnection
-	grpcConn       *grpc.ClientConn
+	grpcClient     api.TranscoderClient
 	promises       map[string]chan *webrtc.TrackRemote
 }
 
-func NewTranscoderAPIClient(conn *grpc.ClientConn) (*TranscoderClient, error) {
-	peerConnection, err := NewTranscoderPeerConnection(webrtc.Configuration{
+func NewClient(ctx context.Context, conn *grpc.ClientConn) (*Client, error) {
+	peerConnection, err := webrtc.NewPeerConnection(webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{
 			{URLs: []string{"stun:stun.l.google.com:19302"}},
 		},
@@ -30,14 +31,17 @@ func NewTranscoderAPIClient(conn *grpc.ClientConn) (*TranscoderClient, error) {
 		return nil, err
 	}
 
-	client, err := transcoder.NewTranscoderClient(conn).Signal(context.Background())
+	client := api.NewTranscoderClient(conn)
+
+	signal, err := client.Signal(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	c := &TranscoderClient{
+	c := &Client{
+		ctx:            ctx,
 		peerConnection: peerConnection,
-		grpcConn:       conn,
+		grpcClient:     client,
 		promises:       make(map[string]chan *webrtc.TrackRemote),
 	}
 
@@ -53,8 +57,8 @@ func NewTranscoderAPIClient(conn *grpc.ClientConn) (*TranscoderClient, error) {
 			return
 		}
 
-		if err := client.Send(&transcoder.Request{
-			Payload: &transcoder.Request_OfferSdp{OfferSdp: offer.SDP},
+		if err := signal.Send(&api.SignalMessage{
+			Payload: &api.SignalMessage_OfferSdp{OfferSdp: offer.SDP},
 		}); err != nil {
 			zap.L().Error("failed to send offer", zap.Error(err))
 			return
@@ -72,8 +76,8 @@ func NewTranscoderAPIClient(conn *grpc.ClientConn) (*TranscoderClient, error) {
 			return
 		}
 
-		client.Send(&transcoder.Request{
-			Payload: &transcoder.Request_Trickle{Trickle: string(trickle)},
+		signal.Send(&api.SignalMessage{
+			Payload: &api.SignalMessage_Trickle{Trickle: string(trickle)},
 		})
 	})
 
@@ -90,25 +94,26 @@ func NewTranscoderAPIClient(conn *grpc.ClientConn) (*TranscoderClient, error) {
 			}
 		}()
 
-		if promise, ok := c.promises[tr.ID()]; ok {
+		// By contract, the transcoding server guarantees a globally unique RID for each track.
+		if promise, ok := c.promises[fmt.Sprintf("%s:%s:%s", tr.StreamID(), tr.ID(), tr.RID())]; ok {
 			promise <- tr
-			delete(c.promises, tr.ID())
+			delete(c.promises, tr.RID())
 		} else {
-			zap.L().Error("received track without promise", zap.String("track", tr.ID()), zap.String("promises", fmt.Sprintf("%v", c.promises)))
+			zap.L().Error("received track without promise", zap.String("track", tr.RID()), zap.String("promises", fmt.Sprintf("%v", c.promises)))
 		}
 	})
 
 	go func() {
 		defer peerConnection.Close()
 		for {
-			in, err := client.Recv()
+			in, err := signal.Recv()
 			if err != nil {
 				zap.L().Error("failed to receive", zap.Error(err))
 				return
 			}
 
 			switch payload := in.Payload.(type) {
-			case *transcoder.Reply_OfferSdp:
+			case *api.SignalMessage_OfferSdp:
 				if err := peerConnection.SetRemoteDescription(webrtc.SessionDescription{
 					SDP:  payload.OfferSdp,
 					Type: webrtc.SDPTypeOffer,
@@ -127,14 +132,14 @@ func NewTranscoderAPIClient(conn *grpc.ClientConn) (*TranscoderClient, error) {
 					break
 				}
 
-				if err := client.Send(&transcoder.Request{
-					Payload: &transcoder.Request_AnswerSdp{AnswerSdp: answer.SDP},
+				if err := signal.Send(&api.SignalMessage{
+					Payload: &api.SignalMessage_AnswerSdp{AnswerSdp: answer.SDP},
 				}); err != nil {
 					zap.L().Error("failed to send answer", zap.Error(err))
 					break
 				}
 
-			case *transcoder.Reply_AnswerSdp:
+			case *api.SignalMessage_AnswerSdp:
 				if err := peerConnection.SetRemoteDescription(webrtc.SessionDescription{
 					SDP:  payload.AnswerSdp,
 					Type: webrtc.SDPTypeAnswer,
@@ -143,7 +148,7 @@ func NewTranscoderAPIClient(conn *grpc.ClientConn) (*TranscoderClient, error) {
 					break
 				}
 
-			case *transcoder.Reply_Trickle:
+			case *api.SignalMessage_Trickle:
 				candidate := webrtc.ICECandidateInit{}
 				if err := json.Unmarshal([]byte(payload.Trickle), &candidate); err != nil {
 					zap.L().Error("failed to unmarshal candidate", zap.Error(err))
@@ -161,12 +166,31 @@ func NewTranscoderAPIClient(conn *grpc.ClientConn) (*TranscoderClient, error) {
 	return c, nil
 }
 
-func (c *TranscoderClient) Transcode(tl webrtc.TrackLocal) (*webrtc.TrackRemote, error) {
+type TranscodeOption func(*api.TranscodeRequest)
+
+func (c *Client) Transcode(tl webrtc.TrackLocal, options ...TranscodeOption) (*webrtc.TrackRemote, error) {
 	rtpSender, err := c.peerConnection.AddTrack(tl)
 	if err != nil {
 		return nil, err
 	}
-	
+	request := &api.TranscodeRequest{
+		StreamId: tl.StreamID(),
+		TrackId:  tl.ID(),
+	}
+
+	for _, option := range options {
+		option(request)
+	}
+
+	c.Lock()
+	response, err := c.grpcClient.Transcode(c.ctx, request)
+	if err != nil {
+		return nil, err
+	}
+	promise := make(chan *webrtc.TrackRemote)
+	c.promises[fmt.Sprintf("%s:%s:%s", response.StreamId, response.TrackId, response.RtpStreamId)] = promise
+	c.Unlock()
+
 	go func() {
 		buf := make([]byte, 1500)
 		for {
@@ -176,18 +200,11 @@ func (c *TranscoderClient) Transcode(tl webrtc.TrackLocal) (*webrtc.TrackRemote,
 		}
 	}()
 
-	c.Lock()
-	promise := make(chan *webrtc.TrackRemote)
-	c.promises[tl.ID()] = promise
-	c.Unlock()
-
 	return <-promise, nil
 }
 
-// Close closes the underlying peer connection.
-func (c *TranscoderClient) Close() error {
-	if err := c.grpcConn.Close(); err != nil {
-		return err
+func ToMimeType(mimeType string) TranscodeOption {
+	return func(request *api.TranscodeRequest) {
+		request.MimeType = mimeType
 	}
-	return c.peerConnection.Close()
 }

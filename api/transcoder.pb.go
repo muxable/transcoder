@@ -4,7 +4,7 @@
 // 	protoc        v3.18.1
 // source: transcoder.proto
 
-package transcoder
+package api
 
 import (
 	context "context"
@@ -24,20 +24,20 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-type Request struct {
+type SignalMessage struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
 	// Types that are assignable to Payload:
-	//	*Request_OfferSdp
-	//	*Request_AnswerSdp
-	//	*Request_Trickle
-	Payload isRequest_Payload `protobuf_oneof:"payload"`
+	//	*SignalMessage_OfferSdp
+	//	*SignalMessage_AnswerSdp
+	//	*SignalMessage_Trickle
+	Payload isSignalMessage_Payload `protobuf_oneof:"payload"`
 }
 
-func (x *Request) Reset() {
-	*x = Request{}
+func (x *SignalMessage) Reset() {
+	*x = SignalMessage{}
 	if protoimpl.UnsafeEnabled {
 		mi := &file_transcoder_proto_msgTypes[0]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -45,13 +45,13 @@ func (x *Request) Reset() {
 	}
 }
 
-func (x *Request) String() string {
+func (x *SignalMessage) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*Request) ProtoMessage() {}
+func (*SignalMessage) ProtoMessage() {}
 
-func (x *Request) ProtoReflect() protoreflect.Message {
+func (x *SignalMessage) ProtoReflect() protoreflect.Message {
 	mi := &file_transcoder_proto_msgTypes[0]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -63,75 +63,76 @@ func (x *Request) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use Request.ProtoReflect.Descriptor instead.
-func (*Request) Descriptor() ([]byte, []int) {
+// Deprecated: Use SignalMessage.ProtoReflect.Descriptor instead.
+func (*SignalMessage) Descriptor() ([]byte, []int) {
 	return file_transcoder_proto_rawDescGZIP(), []int{0}
 }
 
-func (m *Request) GetPayload() isRequest_Payload {
+func (m *SignalMessage) GetPayload() isSignalMessage_Payload {
 	if m != nil {
 		return m.Payload
 	}
 	return nil
 }
 
-func (x *Request) GetOfferSdp() string {
-	if x, ok := x.GetPayload().(*Request_OfferSdp); ok {
+func (x *SignalMessage) GetOfferSdp() string {
+	if x, ok := x.GetPayload().(*SignalMessage_OfferSdp); ok {
 		return x.OfferSdp
 	}
 	return ""
 }
 
-func (x *Request) GetAnswerSdp() string {
-	if x, ok := x.GetPayload().(*Request_AnswerSdp); ok {
+func (x *SignalMessage) GetAnswerSdp() string {
+	if x, ok := x.GetPayload().(*SignalMessage_AnswerSdp); ok {
 		return x.AnswerSdp
 	}
 	return ""
 }
 
-func (x *Request) GetTrickle() string {
-	if x, ok := x.GetPayload().(*Request_Trickle); ok {
+func (x *SignalMessage) GetTrickle() string {
+	if x, ok := x.GetPayload().(*SignalMessage_Trickle); ok {
 		return x.Trickle
 	}
 	return ""
 }
 
-type isRequest_Payload interface {
-	isRequest_Payload()
+type isSignalMessage_Payload interface {
+	isSignalMessage_Payload()
 }
 
-type Request_OfferSdp struct {
+type SignalMessage_OfferSdp struct {
 	OfferSdp string `protobuf:"bytes,1,opt,name=offer_sdp,json=offerSdp,proto3,oneof"`
 }
 
-type Request_AnswerSdp struct {
+type SignalMessage_AnswerSdp struct {
 	AnswerSdp string `protobuf:"bytes,2,opt,name=answer_sdp,json=answerSdp,proto3,oneof"`
 }
 
-type Request_Trickle struct {
+type SignalMessage_Trickle struct {
 	Trickle string `protobuf:"bytes,3,opt,name=trickle,proto3,oneof"`
 }
 
-func (*Request_OfferSdp) isRequest_Payload() {}
+func (*SignalMessage_OfferSdp) isSignalMessage_Payload() {}
 
-func (*Request_AnswerSdp) isRequest_Payload() {}
+func (*SignalMessage_AnswerSdp) isSignalMessage_Payload() {}
 
-func (*Request_Trickle) isRequest_Payload() {}
+func (*SignalMessage_Trickle) isSignalMessage_Payload() {}
 
-type Reply struct {
+type TranscodeRequest struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	// Types that are assignable to Payload:
-	//	*Reply_OfferSdp
-	//	*Reply_AnswerSdp
-	//	*Reply_Trickle
-	Payload isReply_Payload `protobuf_oneof:"payload"`
+	StreamId    string `protobuf:"bytes,1,opt,name=stream_id,json=streamId,proto3" json:"stream_id,omitempty"`
+	TrackId     string `protobuf:"bytes,2,opt,name=track_id,json=trackId,proto3" json:"track_id,omitempty"`
+	RtpStreamId string `protobuf:"bytes,3,opt,name=rtp_stream_id,json=rtpStreamId,proto3" json:"rtp_stream_id,omitempty"`
+	// gstreamer_pipeline must be compatible with mime_type.
+	GstreamerPipeline string `protobuf:"bytes,4,opt,name=gstreamer_pipeline,json=gstreamerPipeline,proto3" json:"gstreamer_pipeline,omitempty"`
+	MimeType          string `protobuf:"bytes,5,opt,name=mime_type,json=mimeType,proto3" json:"mime_type,omitempty"`
 }
 
-func (x *Reply) Reset() {
-	*x = Reply{}
+func (x *TranscodeRequest) Reset() {
+	*x = TranscodeRequest{}
 	if protoimpl.UnsafeEnabled {
 		mi := &file_transcoder_proto_msgTypes[1]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -139,13 +140,13 @@ func (x *Reply) Reset() {
 	}
 }
 
-func (x *Reply) String() string {
+func (x *TranscodeRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*Reply) ProtoMessage() {}
+func (*TranscodeRequest) ProtoMessage() {}
 
-func (x *Reply) ProtoReflect() protoreflect.Message {
+func (x *TranscodeRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_transcoder_proto_msgTypes[1]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -157,87 +158,151 @@ func (x *Reply) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use Reply.ProtoReflect.Descriptor instead.
-func (*Reply) Descriptor() ([]byte, []int) {
+// Deprecated: Use TranscodeRequest.ProtoReflect.Descriptor instead.
+func (*TranscodeRequest) Descriptor() ([]byte, []int) {
 	return file_transcoder_proto_rawDescGZIP(), []int{1}
 }
 
-func (m *Reply) GetPayload() isReply_Payload {
-	if m != nil {
-		return m.Payload
-	}
-	return nil
-}
-
-func (x *Reply) GetOfferSdp() string {
-	if x, ok := x.GetPayload().(*Reply_OfferSdp); ok {
-		return x.OfferSdp
+func (x *TranscodeRequest) GetStreamId() string {
+	if x != nil {
+		return x.StreamId
 	}
 	return ""
 }
 
-func (x *Reply) GetAnswerSdp() string {
-	if x, ok := x.GetPayload().(*Reply_AnswerSdp); ok {
-		return x.AnswerSdp
+func (x *TranscodeRequest) GetTrackId() string {
+	if x != nil {
+		return x.TrackId
 	}
 	return ""
 }
 
-func (x *Reply) GetTrickle() string {
-	if x, ok := x.GetPayload().(*Reply_Trickle); ok {
-		return x.Trickle
+func (x *TranscodeRequest) GetRtpStreamId() string {
+	if x != nil {
+		return x.RtpStreamId
 	}
 	return ""
 }
 
-type isReply_Payload interface {
-	isReply_Payload()
+func (x *TranscodeRequest) GetGstreamerPipeline() string {
+	if x != nil {
+		return x.GstreamerPipeline
+	}
+	return ""
 }
 
-type Reply_OfferSdp struct {
-	OfferSdp string `protobuf:"bytes,1,opt,name=offer_sdp,json=offerSdp,proto3,oneof"`
+func (x *TranscodeRequest) GetMimeType() string {
+	if x != nil {
+		return x.MimeType
+	}
+	return ""
 }
 
-type Reply_AnswerSdp struct {
-	AnswerSdp string `protobuf:"bytes,2,opt,name=answer_sdp,json=answerSdp,proto3,oneof"`
+type TranscodeResponse struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	StreamId    string `protobuf:"bytes,1,opt,name=stream_id,json=streamId,proto3" json:"stream_id,omitempty"`
+	TrackId     string `protobuf:"bytes,2,opt,name=track_id,json=trackId,proto3" json:"track_id,omitempty"`
+	RtpStreamId string `protobuf:"bytes,3,opt,name=rtp_stream_id,json=rtpStreamId,proto3" json:"rtp_stream_id,omitempty"`
 }
 
-type Reply_Trickle struct {
-	Trickle string `protobuf:"bytes,3,opt,name=trickle,proto3,oneof"`
+func (x *TranscodeResponse) Reset() {
+	*x = TranscodeResponse{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_transcoder_proto_msgTypes[2]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
 }
 
-func (*Reply_OfferSdp) isReply_Payload() {}
+func (x *TranscodeResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
 
-func (*Reply_AnswerSdp) isReply_Payload() {}
+func (*TranscodeResponse) ProtoMessage() {}
 
-func (*Reply_Trickle) isReply_Payload() {}
+func (x *TranscodeResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_transcoder_proto_msgTypes[2]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TranscodeResponse.ProtoReflect.Descriptor instead.
+func (*TranscodeResponse) Descriptor() ([]byte, []int) {
+	return file_transcoder_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *TranscodeResponse) GetStreamId() string {
+	if x != nil {
+		return x.StreamId
+	}
+	return ""
+}
+
+func (x *TranscodeResponse) GetTrackId() string {
+	if x != nil {
+		return x.TrackId
+	}
+	return ""
+}
+
+func (x *TranscodeResponse) GetRtpStreamId() string {
+	if x != nil {
+		return x.RtpStreamId
+	}
+	return ""
+}
 
 var File_transcoder_proto protoreflect.FileDescriptor
 
 var file_transcoder_proto_rawDesc = []byte{
 	0x0a, 0x10, 0x74, 0x72, 0x61, 0x6e, 0x73, 0x63, 0x6f, 0x64, 0x65, 0x72, 0x2e, 0x70, 0x72, 0x6f,
-	0x74, 0x6f, 0x12, 0x0a, 0x74, 0x72, 0x61, 0x6e, 0x73, 0x63, 0x6f, 0x64, 0x65, 0x72, 0x22, 0x70,
-	0x0a, 0x07, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x1d, 0x0a, 0x09, 0x6f, 0x66, 0x66,
-	0x65, 0x72, 0x5f, 0x73, 0x64, 0x70, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x48, 0x00, 0x52, 0x08,
-	0x6f, 0x66, 0x66, 0x65, 0x72, 0x53, 0x64, 0x70, 0x12, 0x1f, 0x0a, 0x0a, 0x61, 0x6e, 0x73, 0x77,
-	0x65, 0x72, 0x5f, 0x73, 0x64, 0x70, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x48, 0x00, 0x52, 0x09,
-	0x61, 0x6e, 0x73, 0x77, 0x65, 0x72, 0x53, 0x64, 0x70, 0x12, 0x1a, 0x0a, 0x07, 0x74, 0x72, 0x69,
-	0x63, 0x6b, 0x6c, 0x65, 0x18, 0x03, 0x20, 0x01, 0x28, 0x09, 0x48, 0x00, 0x52, 0x07, 0x74, 0x72,
-	0x69, 0x63, 0x6b, 0x6c, 0x65, 0x42, 0x09, 0x0a, 0x07, 0x70, 0x61, 0x79, 0x6c, 0x6f, 0x61, 0x64,
-	0x22, 0x6e, 0x0a, 0x05, 0x52, 0x65, 0x70, 0x6c, 0x79, 0x12, 0x1d, 0x0a, 0x09, 0x6f, 0x66, 0x66,
-	0x65, 0x72, 0x5f, 0x73, 0x64, 0x70, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x48, 0x00, 0x52, 0x08,
-	0x6f, 0x66, 0x66, 0x65, 0x72, 0x53, 0x64, 0x70, 0x12, 0x1f, 0x0a, 0x0a, 0x61, 0x6e, 0x73, 0x77,
-	0x65, 0x72, 0x5f, 0x73, 0x64, 0x70, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x48, 0x00, 0x52, 0x09,
-	0x61, 0x6e, 0x73, 0x77, 0x65, 0x72, 0x53, 0x64, 0x70, 0x12, 0x1a, 0x0a, 0x07, 0x74, 0x72, 0x69,
-	0x63, 0x6b, 0x6c, 0x65, 0x18, 0x03, 0x20, 0x01, 0x28, 0x09, 0x48, 0x00, 0x52, 0x07, 0x74, 0x72,
-	0x69, 0x63, 0x6b, 0x6c, 0x65, 0x42, 0x09, 0x0a, 0x07, 0x70, 0x61, 0x79, 0x6c, 0x6f, 0x61, 0x64,
-	0x32, 0x44, 0x0a, 0x0a, 0x54, 0x72, 0x61, 0x6e, 0x73, 0x63, 0x6f, 0x64, 0x65, 0x72, 0x12, 0x36,
-	0x0a, 0x06, 0x53, 0x69, 0x67, 0x6e, 0x61, 0x6c, 0x12, 0x13, 0x2e, 0x74, 0x72, 0x61, 0x6e, 0x73,
-	0x63, 0x6f, 0x64, 0x65, 0x72, 0x2e, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x11, 0x2e,
-	0x74, 0x72, 0x61, 0x6e, 0x73, 0x63, 0x6f, 0x64, 0x65, 0x72, 0x2e, 0x52, 0x65, 0x70, 0x6c, 0x79,
-	0x22, 0x00, 0x28, 0x01, 0x30, 0x01, 0x42, 0x1f, 0x5a, 0x1d, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62,
-	0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x6d, 0x75, 0x78, 0x61, 0x62, 0x6c, 0x65, 0x2f, 0x74, 0x72, 0x61,
-	0x6e, 0x73, 0x63, 0x6f, 0x64, 0x65, 0x72, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x74, 0x6f, 0x12, 0x03, 0x61, 0x70, 0x69, 0x22, 0x76, 0x0a, 0x0d, 0x53, 0x69, 0x67, 0x6e, 0x61,
+	0x6c, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x12, 0x1d, 0x0a, 0x09, 0x6f, 0x66, 0x66, 0x65,
+	0x72, 0x5f, 0x73, 0x64, 0x70, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x48, 0x00, 0x52, 0x08, 0x6f,
+	0x66, 0x66, 0x65, 0x72, 0x53, 0x64, 0x70, 0x12, 0x1f, 0x0a, 0x0a, 0x61, 0x6e, 0x73, 0x77, 0x65,
+	0x72, 0x5f, 0x73, 0x64, 0x70, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x48, 0x00, 0x52, 0x09, 0x61,
+	0x6e, 0x73, 0x77, 0x65, 0x72, 0x53, 0x64, 0x70, 0x12, 0x1a, 0x0a, 0x07, 0x74, 0x72, 0x69, 0x63,
+	0x6b, 0x6c, 0x65, 0x18, 0x03, 0x20, 0x01, 0x28, 0x09, 0x48, 0x00, 0x52, 0x07, 0x74, 0x72, 0x69,
+	0x63, 0x6b, 0x6c, 0x65, 0x42, 0x09, 0x0a, 0x07, 0x70, 0x61, 0x79, 0x6c, 0x6f, 0x61, 0x64, 0x22,
+	0xba, 0x01, 0x0a, 0x10, 0x54, 0x72, 0x61, 0x6e, 0x73, 0x63, 0x6f, 0x64, 0x65, 0x52, 0x65, 0x71,
+	0x75, 0x65, 0x73, 0x74, 0x12, 0x1b, 0x0a, 0x09, 0x73, 0x74, 0x72, 0x65, 0x61, 0x6d, 0x5f, 0x69,
+	0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x08, 0x73, 0x74, 0x72, 0x65, 0x61, 0x6d, 0x49,
+	0x64, 0x12, 0x19, 0x0a, 0x08, 0x74, 0x72, 0x61, 0x63, 0x6b, 0x5f, 0x69, 0x64, 0x18, 0x02, 0x20,
+	0x01, 0x28, 0x09, 0x52, 0x07, 0x74, 0x72, 0x61, 0x63, 0x6b, 0x49, 0x64, 0x12, 0x22, 0x0a, 0x0d,
+	0x72, 0x74, 0x70, 0x5f, 0x73, 0x74, 0x72, 0x65, 0x61, 0x6d, 0x5f, 0x69, 0x64, 0x18, 0x03, 0x20,
+	0x01, 0x28, 0x09, 0x52, 0x0b, 0x72, 0x74, 0x70, 0x53, 0x74, 0x72, 0x65, 0x61, 0x6d, 0x49, 0x64,
+	0x12, 0x2d, 0x0a, 0x12, 0x67, 0x73, 0x74, 0x72, 0x65, 0x61, 0x6d, 0x65, 0x72, 0x5f, 0x70, 0x69,
+	0x70, 0x65, 0x6c, 0x69, 0x6e, 0x65, 0x18, 0x04, 0x20, 0x01, 0x28, 0x09, 0x52, 0x11, 0x67, 0x73,
+	0x74, 0x72, 0x65, 0x61, 0x6d, 0x65, 0x72, 0x50, 0x69, 0x70, 0x65, 0x6c, 0x69, 0x6e, 0x65, 0x12,
+	0x1b, 0x0a, 0x09, 0x6d, 0x69, 0x6d, 0x65, 0x5f, 0x74, 0x79, 0x70, 0x65, 0x18, 0x05, 0x20, 0x01,
+	0x28, 0x09, 0x52, 0x08, 0x6d, 0x69, 0x6d, 0x65, 0x54, 0x79, 0x70, 0x65, 0x22, 0x6f, 0x0a, 0x11,
+	0x54, 0x72, 0x61, 0x6e, 0x73, 0x63, 0x6f, 0x64, 0x65, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73,
+	0x65, 0x12, 0x1b, 0x0a, 0x09, 0x73, 0x74, 0x72, 0x65, 0x61, 0x6d, 0x5f, 0x69, 0x64, 0x18, 0x01,
+	0x20, 0x01, 0x28, 0x09, 0x52, 0x08, 0x73, 0x74, 0x72, 0x65, 0x61, 0x6d, 0x49, 0x64, 0x12, 0x19,
+	0x0a, 0x08, 0x74, 0x72, 0x61, 0x63, 0x6b, 0x5f, 0x69, 0x64, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09,
+	0x52, 0x07, 0x74, 0x72, 0x61, 0x63, 0x6b, 0x49, 0x64, 0x12, 0x22, 0x0a, 0x0d, 0x72, 0x74, 0x70,
+	0x5f, 0x73, 0x74, 0x72, 0x65, 0x61, 0x6d, 0x5f, 0x69, 0x64, 0x18, 0x03, 0x20, 0x01, 0x28, 0x09,
+	0x52, 0x0b, 0x72, 0x74, 0x70, 0x53, 0x74, 0x72, 0x65, 0x61, 0x6d, 0x49, 0x64, 0x32, 0x82, 0x01,
+	0x0a, 0x0a, 0x54, 0x72, 0x61, 0x6e, 0x73, 0x63, 0x6f, 0x64, 0x65, 0x72, 0x12, 0x36, 0x0a, 0x06,
+	0x53, 0x69, 0x67, 0x6e, 0x61, 0x6c, 0x12, 0x12, 0x2e, 0x61, 0x70, 0x69, 0x2e, 0x53, 0x69, 0x67,
+	0x6e, 0x61, 0x6c, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x1a, 0x12, 0x2e, 0x61, 0x70, 0x69,
+	0x2e, 0x53, 0x69, 0x67, 0x6e, 0x61, 0x6c, 0x4d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x22, 0x00,
+	0x28, 0x01, 0x30, 0x01, 0x12, 0x3c, 0x0a, 0x09, 0x54, 0x72, 0x61, 0x6e, 0x73, 0x63, 0x6f, 0x64,
+	0x65, 0x12, 0x15, 0x2e, 0x61, 0x70, 0x69, 0x2e, 0x54, 0x72, 0x61, 0x6e, 0x73, 0x63, 0x6f, 0x64,
+	0x65, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a, 0x16, 0x2e, 0x61, 0x70, 0x69, 0x2e, 0x54,
+	0x72, 0x61, 0x6e, 0x73, 0x63, 0x6f, 0x64, 0x65, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65,
+	0x22, 0x00, 0x42, 0x23, 0x5a, 0x21, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d,
+	0x2f, 0x6d, 0x75, 0x78, 0x61, 0x62, 0x6c, 0x65, 0x2f, 0x74, 0x72, 0x61, 0x6e, 0x73, 0x63, 0x6f,
+	0x64, 0x65, 0x72, 0x2f, 0x61, 0x70, 0x69, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -252,16 +317,19 @@ func file_transcoder_proto_rawDescGZIP() []byte {
 	return file_transcoder_proto_rawDescData
 }
 
-var file_transcoder_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_transcoder_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
 var file_transcoder_proto_goTypes = []interface{}{
-	(*Request)(nil), // 0: transcoder.Request
-	(*Reply)(nil),   // 1: transcoder.Reply
+	(*SignalMessage)(nil),     // 0: api.SignalMessage
+	(*TranscodeRequest)(nil),  // 1: api.TranscodeRequest
+	(*TranscodeResponse)(nil), // 2: api.TranscodeResponse
 }
 var file_transcoder_proto_depIdxs = []int32{
-	0, // 0: transcoder.Transcoder.Signal:input_type -> transcoder.Request
-	1, // 1: transcoder.Transcoder.Signal:output_type -> transcoder.Reply
-	1, // [1:2] is the sub-list for method output_type
-	0, // [0:1] is the sub-list for method input_type
+	0, // 0: api.Transcoder.Signal:input_type -> api.SignalMessage
+	1, // 1: api.Transcoder.Transcode:input_type -> api.TranscodeRequest
+	0, // 2: api.Transcoder.Signal:output_type -> api.SignalMessage
+	2, // 3: api.Transcoder.Transcode:output_type -> api.TranscodeResponse
+	2, // [2:4] is the sub-list for method output_type
+	0, // [0:2] is the sub-list for method input_type
 	0, // [0:0] is the sub-list for extension type_name
 	0, // [0:0] is the sub-list for extension extendee
 	0, // [0:0] is the sub-list for field type_name
@@ -274,7 +342,7 @@ func file_transcoder_proto_init() {
 	}
 	if !protoimpl.UnsafeEnabled {
 		file_transcoder_proto_msgTypes[0].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*Request); i {
+			switch v := v.(*SignalMessage); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -286,7 +354,19 @@ func file_transcoder_proto_init() {
 			}
 		}
 		file_transcoder_proto_msgTypes[1].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*Reply); i {
+			switch v := v.(*TranscodeRequest); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_transcoder_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*TranscodeResponse); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -299,14 +379,9 @@ func file_transcoder_proto_init() {
 		}
 	}
 	file_transcoder_proto_msgTypes[0].OneofWrappers = []interface{}{
-		(*Request_OfferSdp)(nil),
-		(*Request_AnswerSdp)(nil),
-		(*Request_Trickle)(nil),
-	}
-	file_transcoder_proto_msgTypes[1].OneofWrappers = []interface{}{
-		(*Reply_OfferSdp)(nil),
-		(*Reply_AnswerSdp)(nil),
-		(*Reply_Trickle)(nil),
+		(*SignalMessage_OfferSdp)(nil),
+		(*SignalMessage_AnswerSdp)(nil),
+		(*SignalMessage_Trickle)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -314,7 +389,7 @@ func file_transcoder_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_transcoder_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   2,
+			NumMessages:   3,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
@@ -341,6 +416,7 @@ const _ = grpc.SupportPackageIsVersion6
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://godoc.org/google.golang.org/grpc#ClientConn.NewStream.
 type TranscoderClient interface {
 	Signal(ctx context.Context, opts ...grpc.CallOption) (Transcoder_SignalClient, error)
+	Transcode(ctx context.Context, in *TranscodeRequest, opts ...grpc.CallOption) (*TranscodeResponse, error)
 }
 
 type transcoderClient struct {
@@ -352,7 +428,7 @@ func NewTranscoderClient(cc grpc.ClientConnInterface) TranscoderClient {
 }
 
 func (c *transcoderClient) Signal(ctx context.Context, opts ...grpc.CallOption) (Transcoder_SignalClient, error) {
-	stream, err := c.cc.NewStream(ctx, &_Transcoder_serviceDesc.Streams[0], "/transcoder.Transcoder/Signal", opts...)
+	stream, err := c.cc.NewStream(ctx, &_Transcoder_serviceDesc.Streams[0], "/api.Transcoder/Signal", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -361,8 +437,8 @@ func (c *transcoderClient) Signal(ctx context.Context, opts ...grpc.CallOption) 
 }
 
 type Transcoder_SignalClient interface {
-	Send(*Request) error
-	Recv() (*Reply, error)
+	Send(*SignalMessage) error
+	Recv() (*SignalMessage, error)
 	grpc.ClientStream
 }
 
@@ -370,21 +446,31 @@ type transcoderSignalClient struct {
 	grpc.ClientStream
 }
 
-func (x *transcoderSignalClient) Send(m *Request) error {
+func (x *transcoderSignalClient) Send(m *SignalMessage) error {
 	return x.ClientStream.SendMsg(m)
 }
 
-func (x *transcoderSignalClient) Recv() (*Reply, error) {
-	m := new(Reply)
+func (x *transcoderSignalClient) Recv() (*SignalMessage, error) {
+	m := new(SignalMessage)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
 	return m, nil
 }
 
+func (c *transcoderClient) Transcode(ctx context.Context, in *TranscodeRequest, opts ...grpc.CallOption) (*TranscodeResponse, error) {
+	out := new(TranscodeResponse)
+	err := c.cc.Invoke(ctx, "/api.Transcoder/Transcode", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // TranscoderServer is the server API for Transcoder service.
 type TranscoderServer interface {
 	Signal(Transcoder_SignalServer) error
+	Transcode(context.Context, *TranscodeRequest) (*TranscodeResponse, error)
 }
 
 // UnimplementedTranscoderServer can be embedded to have forward compatible implementations.
@@ -393,6 +479,9 @@ type UnimplementedTranscoderServer struct {
 
 func (*UnimplementedTranscoderServer) Signal(Transcoder_SignalServer) error {
 	return status.Errorf(codes.Unimplemented, "method Signal not implemented")
+}
+func (*UnimplementedTranscoderServer) Transcode(context.Context, *TranscodeRequest) (*TranscodeResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Transcode not implemented")
 }
 
 func RegisterTranscoderServer(s *grpc.Server, srv TranscoderServer) {
@@ -404,8 +493,8 @@ func _Transcoder_Signal_Handler(srv interface{}, stream grpc.ServerStream) error
 }
 
 type Transcoder_SignalServer interface {
-	Send(*Reply) error
-	Recv() (*Request, error)
+	Send(*SignalMessage) error
+	Recv() (*SignalMessage, error)
 	grpc.ServerStream
 }
 
@@ -413,22 +502,45 @@ type transcoderSignalServer struct {
 	grpc.ServerStream
 }
 
-func (x *transcoderSignalServer) Send(m *Reply) error {
+func (x *transcoderSignalServer) Send(m *SignalMessage) error {
 	return x.ServerStream.SendMsg(m)
 }
 
-func (x *transcoderSignalServer) Recv() (*Request, error) {
-	m := new(Request)
+func (x *transcoderSignalServer) Recv() (*SignalMessage, error) {
+	m := new(SignalMessage)
 	if err := x.ServerStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
 	return m, nil
 }
 
+func _Transcoder_Transcode_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(TranscodeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TranscoderServer).Transcode(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/api.Transcoder/Transcode",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TranscoderServer).Transcode(ctx, req.(*TranscodeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 var _Transcoder_serviceDesc = grpc.ServiceDesc{
-	ServiceName: "transcoder.Transcoder",
+	ServiceName: "api.Transcoder",
 	HandlerType: (*TranscoderServer)(nil),
-	Methods:     []grpc.MethodDesc{},
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "Transcode",
+			Handler:    _Transcoder_Transcode_Handler,
+		},
+	},
 	Streams: []grpc.StreamDesc{
 		{
 			StreamName:    "Signal",

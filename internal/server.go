@@ -1,28 +1,60 @@
 package internal
 
 import (
+	"context"
 	"encoding/json"
+	"sync"
 
-	transcoder "github.com/muxable/transcoder/api"
-	"github.com/muxable/transcoder/pkg"
+	"github.com/muxable/transcoder/api"
+	"github.com/notedit/gst"
 	"github.com/pion/webrtc/v3"
 	"go.uber.org/zap"
 )
 
-type TranscoderServer struct {
-	transcoder.UnimplementedTranscoderServer
-	webrtc.Configuration
+type Source struct {
+	*webrtc.PeerConnection
+	*webrtc.TrackRemote
 
-	OnPeerConnection func(pc *webrtc.PeerConnection)
+	Parent *gst.Pipeline
 }
 
-func (s *TranscoderServer) Signal(conn transcoder.Transcoder_SignalServer) error {
-	peerConnection, err := pkg.NewTranscoderPeerConnection(s.Configuration)
+type TranscoderServer struct {
+	api.UnimplementedTranscoderServer
+	config webrtc.Configuration
+
+	// the transcoding server likely cannot process a huge number of remote tracks
+	// so there's no need to optimize this.
+	sources []*Source
+
+	// this is like the poor man's rx behavior subject.
+	onTrack *sync.Cond
+}
+
+func NewTranscoderServer(config webrtc.Configuration) *TranscoderServer {
+	return &TranscoderServer{
+		config:  config,
+		onTrack: sync.NewCond(&sync.Mutex{}),
+	}
+}
+
+func (s *TranscoderServer) Signal(conn api.Transcoder_SignalServer) error {
+	peerConnection, err := NewTranscoderPeerConnection(s.config)
 	if err != nil {
 		return err
 	}
 
-	defer peerConnection.Close()
+	pipeline, err := gst.PipelineNew("")
+	if err != nil {
+		return err
+	}
+
+	pipeline.SetState(gst.StatePlaying)
+
+	peerConnection.OnConnectionStateChange(func(pcs webrtc.PeerConnectionState) {
+		if pcs == webrtc.PeerConnectionStateClosed {
+			pipeline.SetState(gst.StateNull)
+		}
+	})
 
 	peerConnection.OnNegotiationNeeded(func() {
 		offer, err := peerConnection.CreateOffer(nil)
@@ -36,8 +68,8 @@ func (s *TranscoderServer) Signal(conn transcoder.Transcoder_SignalServer) error
 			return
 		}
 
-		if err := conn.Send(&transcoder.Reply{
-			Payload: &transcoder.Reply_OfferSdp{OfferSdp: offer.SDP},
+		if err := conn.Send(&api.SignalMessage{
+			Payload: &api.SignalMessage_OfferSdp{OfferSdp: offer.SDP},
 		}); err != nil {
 			zap.L().Error("failed to send offer", zap.Error(err))
 		}
@@ -54,12 +86,31 @@ func (s *TranscoderServer) Signal(conn transcoder.Transcoder_SignalServer) error
 			return
 		}
 
-		conn.Send(&transcoder.Reply{
-			Payload: &transcoder.Reply_Trickle{Trickle: string(trickle)},
+		conn.Send(&api.SignalMessage{
+			Payload: &api.SignalMessage_Trickle{Trickle: string(trickle)},
 		})
 	})
 
-	s.OnPeerConnection(peerConnection)
+	peerConnection.OnTrack(func(tr *webrtc.TrackRemote, r *webrtc.RTPReceiver) {
+		go func() {
+			buf := make([]byte, 1500)
+			for {
+				if _, _, err := r.Read(buf); err != nil {
+					return
+				}
+			}
+		}()
+
+		s.onTrack.L.Lock()
+		s.sources = append(s.sources, &Source{
+			PeerConnection: peerConnection,
+			TrackRemote:    tr,
+			Parent:         pipeline,
+		})
+
+		s.onTrack.Broadcast()
+		s.onTrack.L.Unlock()
+	})
 
 	for {
 		in, err := conn.Recv()
@@ -69,7 +120,7 @@ func (s *TranscoderServer) Signal(conn transcoder.Transcoder_SignalServer) error
 		}
 
 		switch payload := in.Payload.(type) {
-		case *transcoder.Request_OfferSdp:
+		case *api.SignalMessage_OfferSdp:
 			if err := peerConnection.SetRemoteDescription(webrtc.SessionDescription{
 				SDP:  payload.OfferSdp,
 				Type: webrtc.SDPTypeOffer,
@@ -85,13 +136,13 @@ func (s *TranscoderServer) Signal(conn transcoder.Transcoder_SignalServer) error
 				return err
 			}
 
-			if err := conn.Send(&transcoder.Reply{
-				Payload: &transcoder.Reply_AnswerSdp{AnswerSdp: answer.SDP},
+			if err := conn.Send(&api.SignalMessage{
+				Payload: &api.SignalMessage_AnswerSdp{AnswerSdp: answer.SDP},
 			}); err != nil {
 				return err
 			}
 
-		case *transcoder.Request_AnswerSdp:
+		case *api.SignalMessage_AnswerSdp:
 			if err := peerConnection.SetRemoteDescription(webrtc.SessionDescription{
 				SDP:  payload.AnswerSdp,
 				Type: webrtc.SDPTypeAnswer,
@@ -99,7 +150,7 @@ func (s *TranscoderServer) Signal(conn transcoder.Transcoder_SignalServer) error
 				return err
 			}
 
-		case *transcoder.Request_Trickle:
+		case *api.SignalMessage_Trickle:
 			candidate := webrtc.ICECandidateInit{}
 			if err := json.Unmarshal([]byte(payload.Trickle), &candidate); err != nil {
 				return err
@@ -110,4 +161,53 @@ func (s *TranscoderServer) Signal(conn transcoder.Transcoder_SignalServer) error
 			}
 		}
 	}
+}
+
+func (s *TranscoderServer) Transcode(ctx context.Context, request *api.TranscodeRequest) (*api.TranscodeResponse, error) {
+	var matched *Source
+	for matched == nil {
+		s.onTrack.L.Lock()
+		// find the track that matches the request.
+		for i, source := range s.sources {
+			tr := source.TrackRemote
+			if tr.StreamID() == request.StreamId && tr.ID() == request.TrackId && tr.RID() == request.RtpStreamId {
+				matched = source
+				s.sources = append(s.sources[:i], s.sources[i+1:]...)
+				break
+			}
+		}
+
+		if matched == nil {
+			s.onTrack.Wait()
+		}
+		s.onTrack.L.Unlock()
+	}
+
+
+	// tr is the remote track that matches the request.
+	tl, err := TranscodeTrackRemote(matched.Parent, matched.TrackRemote, request.GstreamerPipeline, request.MimeType)
+	if err != nil {
+		return nil, err
+	}
+
+	rtpSender, err := matched.PeerConnection.AddTrack(tl)
+	if err != nil {
+		return nil, err
+	}
+
+	go func() {
+		buf := make([]byte, 1500)
+		for {
+			if _, _, err := rtpSender.Read(buf); err != nil {
+				return
+			}
+		}
+	}()
+
+	// respond with the RTP stream ID.
+	return &api.TranscodeResponse{
+		StreamId:    tl.StreamID(),
+		TrackId:     tl.ID(),
+		RtpStreamId: tl.RID(),
+	}, nil
 }

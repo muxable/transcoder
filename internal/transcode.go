@@ -39,156 +39,136 @@ func ToRTPCaps(codec webrtc.RTPCodecParameters) string {
 	return "application/x-rtp"
 }
 
-func PipelineString(codec webrtc.RTPCodecParameters) (string, error) {
-	appsrc := fmt.Sprintf("appsrc format=time do-timestamp=true name=source ! %s ! queue", ToRTPCaps(codec))
+func PipelineString(trCodec webrtc.RTPCodecParameters, encodingStr string) (string, error) {
+	appsrc := fmt.Sprintf("appsrc format=time name=source ! %s ! queue", ToRTPCaps(trCodec))
 	// appsink outputs rtp's because the pion h264 payloader is more reliable and easier to debug
 	// than the gstreamer payloader.
-	appsink := "queue ! appsink name=rtpsink"
+	appsink := encodingStr + " ! queue ! appsink name=sink"
 
-	switch codec.MimeType {
+	switch trCodec.MimeType {
 	// video codecs
 	case "video/H265":
-		return appsrc + ` ! rtph265depay ! decodebin ! queue ! videoconvert ! x264enc speed-preset=ultrafast tune=zerolatency key-int-max=20 ! ` + appsink, nil
+		return appsrc + ` ! rtpjitterbuffer ! rtph265depay ! decodebin ! queue ! videoconvert ! ` + appsink, nil
 	case webrtc.MimeTypeH264:
-		return appsrc + ` ! rtph264depay ! ` + appsink, nil
+		return appsrc + ` ! rtpjitterbuffer ! rtph264depay ! decodebin ! queue ! videoconvert ! ` + appsink, nil
 	case webrtc.MimeTypeVP8:
-		return appsrc + ` ! rtpvp8depay ! decodebin ! queue ! videoconvert ! x264enc speed-preset=ultrafast tune=zerolatency key-int-max=20 ! ` + appsink, nil
+		return appsrc + ` ! rtpjitterbuffer ! rtpvp8depay ! decodebin ! queue ! videoconvert ! ` + appsink, nil
 	case webrtc.MimeTypeVP9:
-		return appsrc + ` ! rtpvp9depay ! decodebin ! queue ! videoconvert ! x264enc speed-preset=ultrafast tune=zerolatency key-int-max=20 ! ` + appsink, nil
+		return appsrc + ` ! rtpjitterbuffer ! rtpvp9depay ! decodebin ! queue ! videoconvert ! ` + appsink, nil
 	// audio codecs
 	case webrtc.MimeTypeOpus:
-		return appsrc + ` ! rtpopusdepay ! ` + appsink, nil
+		return appsrc + ` ! rtpjitterbuffer ! rtpopusdepay ! decodebin ! queue ! audioconvert ! audioresample ! ` + appsink, nil
 	case "audio/aac":
-		return appsrc + ` ! rtpmp4adepay ! decodebin ! queue ! audioconvert ! opusenc ! ` + appsink, nil
+		return appsrc + ` ! rtpjitterbuffer ! rtpmp4adepay ! decodebin ! queue ! audioconvert ! audioresample ! ` + appsink, nil
 	case webrtc.MimeTypeG722:
-		return appsrc + ` ! rtpg722depay ! decodebin ! queue ! audioconvert ! audioresample ! opusenc ! ` + appsink, nil
+		return appsrc + ` ! rtpjitterbuffer ! rtpg722depay ! decodebin ! queue ! audioconvert ! audioresample ! ` + appsink, nil
 	}
-	return "", fmt.Errorf("unsupported codec %s", codec.MimeType)
+	return "", fmt.Errorf("unsupported codec %s", trCodec.MimeType)
 }
 
-func TargetCodec(codec webrtc.RTPCodecCapability) (*webrtc.RTPCodecCapability, rtp.Payloader, error) {
-	switch codec.MimeType {
-	case "video/H265", webrtc.MimeTypeH264, webrtc.MimeTypeVP8, webrtc.MimeTypeVP9:
+func EncodingPipelineStr(mimeType string) (string, error) {
+	switch mimeType {
+	case webrtc.MimeTypeH264, "" /* default */:
+		return "x264enc speed-preset=ultrafast tune=zerolatency key-int-max=20", nil
+	case webrtc.MimeTypeVP8:
+		return "vp8enc deadline=1", nil
+	case webrtc.MimeTypeOpus:
+		return "opusenc", nil
+	}
+	return "", fmt.Errorf("unsupported codec %s", mimeType)
+}
+
+func TargetCodec(mimeType string) (*webrtc.RTPCodecCapability, rtp.Payloader, error) {
+	switch mimeType {
+	case webrtc.MimeTypeH264, "" /* default */:
 		return &webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeH264, ClockRate: 90000}, &codecs.H264Payloader{}, nil
-	case webrtc.MimeTypeOpus, "audio/aac", webrtc.MimeTypeG722:
+	case webrtc.MimeTypeVP8:
+		return &webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeVP8, ClockRate: 90000}, &codecs.VP8Payloader{}, nil
+	case webrtc.MimeTypeOpus:
 		return &webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeOpus, ClockRate: 48000}, &codecs.OpusPayloader{}, nil
 	}
-	return nil, nil, fmt.Errorf("unsupported codec %s", codec.MimeType)
+	return nil, nil, fmt.Errorf("unsupported codec %s", mimeType)
 }
 
-func NewPipeline(codec webrtc.RTPCodecParameters) (*gst.Bin, error) {
-	pipelineStr, err := PipelineString(codec)
+
+func TranscodeTrackRemote(parent *gst.Pipeline, tr *webrtc.TrackRemote, pipelineStr, mimeType string) (webrtc.TrackLocal, error) {
+	targetCodec, payloader, err := TargetCodec(mimeType)
 	if err != nil {
 		return nil, err
 	}
-	return gst.ParseBinFromDescription(pipelineStr, false)
-}
 
-func TranscodePeerConnection(pc *webrtc.PeerConnection) error {
-	pipeline, err := gst.PipelineNew("transcode")
+	packetizer := NewTSPacketizer(1200, payloader, rtp.NewRandomSequencer())
+
+	tl, err := webrtc.NewTrackLocalStaticRTP(*targetCodec, tr.ID(), tr.StreamID())
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	pipeline.SetState(gst.StatePlaying)
-
-	pc.OnTrack(func(tr *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) {
-		zap.L().Debug("OnTrack", zap.String("kind", tr.Kind().String()), zap.Uint8("payloadType",
-			uint8(tr.Codec().PayloadType)))
-
-		go func() {
-			buf := make([]byte, 1500)
-			for {
-				if _, _, err := receiver.Read(buf); err != nil {
-					return
-				}
-			}
-		}()
-
-		targetCodec, payloader, err := TargetCodec(tr.Codec().RTPCodecCapability)
+	if pipelineStr == "" {
+		pipelineStr, err = EncodingPipelineStr(mimeType)
 		if err != nil {
-			zap.L().Error("could not determine target codec", zap.Error(err))
-			return
+			return nil, err
 		}
+	}
 
-		packetizer := NewTSPacketizer(1200, payloader, rtp.NewRandomSequencer())
+	transcodingPipelineStr, err := PipelineString(tr.Codec(), pipelineStr)
+	if err != nil {
+		return nil, err
+	}
 
-		tl, err := webrtc.NewTrackLocalStaticRTP(*targetCodec, tr.ID(), fmt.Sprintf("%s-transcode", tr.StreamID()))
-		if err != nil {
-			zap.L().Error("could not create track local", zap.Error(err))
-			return
-		}
+	bin, err := gst.ParseBinFromDescription(transcodingPipelineStr, false)
+	if err != nil {
+		return nil, err
+	}
 
-		rtpSender, err := pc.AddTrack(tl)
-		if err != nil {
-			zap.L().Error("could not add track", zap.Error(err))
-			return
-		}
-		
-		go func() {
-			buf := make([]byte, 1500)
-			for {
-				if _, _, err := rtpSender.Read(buf); err != nil {
-					return
-				}
-			}
-		}()
+	parent.Add(&bin.Element)
 
-		bin, err := NewPipeline(tr.Codec())
-		if err != nil {
-			zap.L().Error("could not create pipeline", zap.Error(err))
-			return
-		}
+	bin.SetState(gst.StatePlaying)
 
-		pipeline.Add(&bin.Element)
+	source := bin.GetByName("source")
+	sink := bin.GetByName("sink")
 
-		bin.SetState(gst.StatePlaying)
-
-		source := bin.GetByName("source")
-		rtpsink := bin.GetByName("rtpsink")
-
-		go func() {
-			buf := make([]byte, 1400)
-			for source != nil {
-				i, _, err := tr.Read(buf)
-				if err != nil {
-					if err == io.EOF {
-						if err := source.EndOfStream(); err != nil {
-							zap.L().Error("could not end of stream", zap.Error(err))
-						}
-						return
+	go func() {
+		buf := make([]byte, 1400)
+		for source != nil {
+			i, _, err := tr.Read(buf)
+			if err != nil {
+				if err == io.EOF {
+					if err := source.EndOfStream(); err != nil {
+						zap.L().Error("could not end of stream", zap.Error(err))
 					}
-					zap.L().Error("could not read rtp", zap.Error(err))
 					return
 				}
-				if err := source.PushBuffer(buf[:i]); err != nil {
-					zap.L().Error("could not push buffer", zap.Error(err))
-				}
+				zap.L().Error("could not read rtp", zap.Error(err))
+				return
 			}
-		}()
+			if err := source.PushBuffer(buf[:i]); err != nil {
+				zap.L().Error("could not push buffer", zap.Error(err))
+			}
+		}
+	}()
 
-		go func() {
-			for rtpsink != nil {
-				sample, err := rtpsink.PullSample()
-				if err != nil {
-					if rtpsink.IsEOS() {
-						return
-					}
-					zap.L().Error("could not pull sample", zap.Error(err))
+	go func() {
+		for sink != nil {
+			sample, err := sink.PullSample()
+			if err != nil {
+				if sink.IsEOS() {
 					return
 				}
+				zap.L().Error("could not pull sample", zap.Error(err))
+				return
+			}
 
-				// GStreamer doesn't set the buffer duration for RTP packets, so we compute the timestamp
-				// based on the dts.
-				rtpts := uint32(uint64(sample.Dts) / 1000 * (uint64(targetCodec.ClockRate) / 1000) / 1000)
-				for _, p := range packetizer.Packetize(sample.Data, rtpts) {
-					if err := tl.WriteRTP(p); err != nil {
-						zap.L().Error("could not write rtp", zap.Error(err))
-					}
+			// GStreamer doesn't set the buffer duration for RTP packets, so we compute the timestamp
+			// based on the dts.
+			rtpts := uint32(uint64(sample.Dts) / 1000 * (uint64(targetCodec.ClockRate) / 1000) / 1000)
+			for _, p := range packetizer.Packetize(sample.Data, rtpts) {
+				if err := tl.WriteRTP(p); err != nil {
+					zap.L().Error("could not write rtp", zap.Error(err))
 				}
 			}
-		}()
-	})
+		}
+	}()
 
-	return nil
+	return tl, nil
 }

@@ -1,14 +1,15 @@
 syntax = "proto3";
 
-option go_package = "github.com/muxable/transcoder";
+option go_package = "github.com/muxable/transcoder/api";
 
-package transcoder;
+package api;
 
 service Transcoder {
-  rpc Signal(stream Request) returns (stream Reply) {}
+  rpc Signal(stream SignalMessage) returns (stream SignalMessage) {}
+  rpc Transcode(TranscodeRequest) returns (TranscodeResponse) {}
 }
 
-message Request {
+message SignalMessage {
   oneof payload {
     string offer_sdp = 1;
     string answer_sdp = 2;
@@ -16,10 +17,18 @@ message Request {
   }
 }
 
-message Reply {
-  oneof payload {
-    string offer_sdp = 1;
-    string answer_sdp = 2;
-    string trickle = 3;
-  }
+message TranscodeRequest {
+  string stream_id = 1;
+  string track_id = 2;
+  string rtp_stream_id = 3;
+  
+  string mime_type = 4;
+  // gstreamer_pipeline must be compatible with mime_type, however is optional.
+  string gstreamer_pipeline = 5;
+}
+
+message TranscodeResponse {
+  string stream_id = 1;
+  string track_id = 2;
+  string rtp_stream_id = 3;
 }
