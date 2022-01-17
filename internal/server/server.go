@@ -1,4 +1,4 @@
-package internal
+package server
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/muxable/transcoder/api"
+	"github.com/muxable/transcoder/internal/peerconnection"
 	"github.com/notedit/gst"
 	"github.com/pion/webrtc/v3"
 	"go.uber.org/zap"
@@ -38,7 +39,7 @@ func NewTranscoderServer(config webrtc.Configuration) *TranscoderServer {
 }
 
 func (s *TranscoderServer) Signal(conn api.Transcoder_SignalServer) error {
-	peerConnection, err := NewTranscoderPeerConnection(s.config)
+	peerConnection, err := peerconnection.NewTranscoderPeerConnection(s.config)
 	if err != nil {
 		return err
 	}

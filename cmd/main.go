@@ -7,7 +7,7 @@ import (
 
 	"github.com/blendle/zapdriver"
 	transcoder "github.com/muxable/transcoder/api"
-	"github.com/muxable/transcoder/internal"
+	"github.com/muxable/transcoder/internal/server"
 	"github.com/pion/webrtc/v3"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
@@ -46,7 +46,7 @@ func main() {
 
 	s := grpc.NewServer()
 
-	transcoder.RegisterTranscoderServer(s, internal.NewTranscoderServer(webrtc.Configuration{
+	transcoder.RegisterTranscoderServer(s, server.NewTranscoderServer(webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{
 			{URLs: []string{"stun:stun.l.google.com:19302"}},
 		},

@@ -1,4 +1,4 @@
-package internal
+package server
 
 /*
 #cgo pkg-config: gstreamer-1.0 gstreamer-app-1.0

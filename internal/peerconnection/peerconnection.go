@@ -1,4 +1,5 @@
-package internal
+// peerconnection is a package that configures a peerconnection with additional video types supported.
+package peerconnection
 
 import (
 	"github.com/pion/interceptor"
