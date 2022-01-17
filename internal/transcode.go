@@ -12,7 +12,6 @@ import (
 
 	"github.com/notedit/gst"
 	"github.com/pion/rtp"
-	"github.com/pion/rtp/codecs"
 	"github.com/pion/webrtc/v3"
 	"go.uber.org/zap"
 )
@@ -66,52 +65,15 @@ func PipelineString(trCodec webrtc.RTPCodecParameters, encodingStr string) (stri
 	return "", fmt.Errorf("unsupported codec %s", trCodec.MimeType)
 }
 
-func EncodingPipelineStr(mimeType string) (string, error) {
-	switch mimeType {
-	case webrtc.MimeTypeH264, "" /* default */:
-		return "x264enc speed-preset=ultrafast tune=zerolatency key-int-max=20", nil
-	case webrtc.MimeTypeVP8:
-		return "vp8enc deadline=1", nil
-	case webrtc.MimeTypeOpus:
-		return "opusenc", nil
-	}
-	return "", fmt.Errorf("unsupported codec %s", mimeType)
-}
+func TranscodeTrackRemote(parent *gst.Pipeline, tr *webrtc.TrackRemote, outputCodec *OutputCodec) (webrtc.TrackLocal, error) {
+	packetizer := NewTSPacketizer(1200, outputCodec.Payloader, rtp.NewRandomSequencer())
 
-func TargetCodec(mimeType string) (*webrtc.RTPCodecCapability, rtp.Payloader, error) {
-	switch mimeType {
-	case webrtc.MimeTypeH264, "" /* default */:
-		return &webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeH264, ClockRate: 90000}, &codecs.H264Payloader{}, nil
-	case webrtc.MimeTypeVP8:
-		return &webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeVP8, ClockRate: 90000}, &codecs.VP8Payloader{}, nil
-	case webrtc.MimeTypeOpus:
-		return &webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeOpus, ClockRate: 48000}, &codecs.OpusPayloader{}, nil
-	}
-	return nil, nil, fmt.Errorf("unsupported codec %s", mimeType)
-}
-
-
-func TranscodeTrackRemote(parent *gst.Pipeline, tr *webrtc.TrackRemote, pipelineStr, mimeType string) (webrtc.TrackLocal, error) {
-	targetCodec, payloader, err := TargetCodec(mimeType)
+	tl, err := webrtc.NewTrackLocalStaticRTP(outputCodec.RTPCodecCapability, tr.ID(), tr.StreamID())
 	if err != nil {
 		return nil, err
 	}
 
-	packetizer := NewTSPacketizer(1200, payloader, rtp.NewRandomSequencer())
-
-	tl, err := webrtc.NewTrackLocalStaticRTP(*targetCodec, tr.ID(), tr.StreamID())
-	if err != nil {
-		return nil, err
-	}
-
-	if pipelineStr == "" {
-		pipelineStr, err = EncodingPipelineStr(mimeType)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	transcodingPipelineStr, err := PipelineString(tr.Codec(), pipelineStr)
+	transcodingPipelineStr, err := PipelineString(tr.Codec(), outputCodec.GStreamerEncoder)
 	if err != nil {
 		return nil, err
 	}
@@ -161,7 +123,7 @@ func TranscodeTrackRemote(parent *gst.Pipeline, tr *webrtc.TrackRemote, pipeline
 
 			// GStreamer doesn't set the buffer duration for RTP packets, so we compute the timestamp
 			// based on the dts.
-			rtpts := uint32(uint64(sample.Dts) / 1000 * (uint64(targetCodec.ClockRate) / 1000) / 1000)
+			rtpts := uint32(uint64(sample.Dts) / 1000 * (uint64(outputCodec.ClockRate) / 1000) / 1000)
 			for _, p := range packetizer.Packetize(sample.Data, rtpts) {
 				if err := tl.WriteRTP(p); err != nil {
 					zap.L().Error("could not write rtp", zap.Error(err))

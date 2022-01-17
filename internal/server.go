@@ -183,9 +183,13 @@ func (s *TranscoderServer) Transcode(ctx context.Context, request *api.Transcode
 		s.onTrack.L.Unlock()
 	}
 
+	outputCodec, err := ResolveOutputCodec(matched.TrackRemote, request.MimeType, request.GstreamerPipeline)
+	if err != nil {
+		return nil, err
+	}
 
 	// tr is the remote track that matches the request.
-	tl, err := TranscodeTrackRemote(matched.Parent, matched.TrackRemote, request.GstreamerPipeline, request.MimeType)
+	tl, err := TranscodeTrackRemote(matched.Parent, matched.TrackRemote, outputCodec)
 	if err != nil {
 		return nil, err
 	}

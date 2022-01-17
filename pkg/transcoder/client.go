@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/muxable/transcoder/api"
+	"github.com/muxable/transcoder/internal"
 	"github.com/pion/webrtc/v3"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
@@ -22,7 +23,7 @@ type Client struct {
 }
 
 func NewClient(ctx context.Context, conn *grpc.ClientConn) (*Client, error) {
-	peerConnection, err := webrtc.NewPeerConnection(webrtc.Configuration{
+	peerConnection, err := internal.NewTranscoderPeerConnection(webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{
 			{URLs: []string{"stun:stun.l.google.com:19302"}},
 		},
