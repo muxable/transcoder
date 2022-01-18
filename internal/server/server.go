@@ -87,9 +87,11 @@ func (s *TranscoderServer) Signal(conn api.Transcoder_SignalServer) error {
 			return
 		}
 
-		conn.Send(&api.SignalMessage{
+		if err := conn.Send(&api.SignalMessage{
 			Payload: &api.SignalMessage_Trickle{Trickle: string(trickle)},
-		})
+		}); err != nil {
+			zap.L().Error("failed to send candidate", zap.Error(err))
+		}
 	})
 
 	peerConnection.OnTrack(func(tr *webrtc.TrackRemote, r *webrtc.RTPReceiver) {
