@@ -77,9 +77,11 @@ func NewClient(ctx context.Context, conn *grpc.ClientConn) (*Client, error) {
 			return
 		}
 
-		signal.Send(&api.SignalMessage{
+		if err := signal.Send(&api.SignalMessage{
 			Payload: &api.SignalMessage_Trickle{Trickle: string(trickle)},
-		})
+		}); err != nil {
+			zap.L().Error("failed to send candidate", zap.Error(err))
+		}
 	})
 
 	peerConnection.OnTrack(func(tr *webrtc.TrackRemote, r *webrtc.RTPReceiver) {
