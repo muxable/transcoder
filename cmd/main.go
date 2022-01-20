@@ -6,8 +6,8 @@ import (
 	"os"
 
 	"github.com/blendle/zapdriver"
-	transcoder "github.com/muxable/transcoder/api"
-	"github.com/muxable/transcoder/internal/server"
+	"github.com/muxable/transcoder/api"
+	"github.com/muxable/transcoder/pkg/server"
 	"github.com/pion/webrtc/v3"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
@@ -34,11 +34,11 @@ func main() {
 
 	port := os.Getenv("PORT")
 	if port == "" {
-			port = "50051"
+		port = "50051"
 	}
 
 	addr := fmt.Sprintf(":%s", port)
-	
+
 	lis, err := net.Listen("tcp", addr)
 	if err != nil {
 		panic(err)
@@ -46,7 +46,7 @@ func main() {
 
 	s := grpc.NewServer()
 
-	transcoder.RegisterTranscoderServer(s, server.NewTranscoderServer(webrtc.Configuration{
+	api.RegisterTranscoderServer(s, server.NewTranscoderServer(webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{
 			{URLs: []string{"stun:stun.l.google.com:19302"}},
 		},

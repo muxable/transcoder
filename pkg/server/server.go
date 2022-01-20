@@ -5,9 +5,10 @@ import (
 	"encoding/json"
 	"sync"
 
+	"github.com/muxable/rtpio/pkg/rtpio"
 	"github.com/muxable/transcoder/api"
 	"github.com/muxable/transcoder/internal/peerconnection"
-	"github.com/notedit/gst"
+	"github.com/muxable/transcoder/pkg/transcode"
 	"github.com/pion/webrtc/v3"
 	"go.uber.org/zap"
 )
@@ -15,8 +16,7 @@ import (
 type Source struct {
 	*webrtc.PeerConnection
 	*webrtc.TrackRemote
-
-	Parent *gst.Pipeline
+	*transcode.Synchronizer
 }
 
 type TranscoderServer struct {
@@ -44,16 +44,14 @@ func (s *TranscoderServer) Signal(conn api.Transcoder_SignalServer) error {
 		return err
 	}
 
-	pipeline, err := gst.PipelineNew("")
+	synchronizer, err := transcode.NewSynchronizer()
 	if err != nil {
 		return err
 	}
 
-	pipeline.SetState(gst.StatePlaying)
-
 	peerConnection.OnConnectionStateChange(func(pcs webrtc.PeerConnectionState) {
 		if pcs == webrtc.PeerConnectionStateClosed {
-			pipeline.SetState(gst.StateNull)
+			synchronizer.Close()
 		}
 	})
 
@@ -108,7 +106,7 @@ func (s *TranscoderServer) Signal(conn api.Transcoder_SignalServer) error {
 		s.sources = append(s.sources, &Source{
 			PeerConnection: peerConnection,
 			TrackRemote:    tr,
-			Parent:         pipeline,
+			Synchronizer:   synchronizer,
 		})
 
 		s.onTrack.Broadcast()
@@ -186,16 +184,32 @@ func (s *TranscoderServer) Transcode(ctx context.Context, request *api.Transcode
 		s.onTrack.L.Unlock()
 	}
 
-	outputCodec, err := ResolveOutputCodec(matched.TrackRemote, request.MimeType, request.GstreamerPipeline)
+	// tr is the remote track that matches the request.
+	transcoder, err := transcode.NewTranscoder(matched.TrackRemote.Codec().RTPCodecCapability,
+		transcode.WithSynchronizer(matched.Synchronizer),
+		transcode.ToMimeType(request.MimeType),
+		transcode.ViaGStreamerEncoder(request.GstreamerPipeline))
 	if err != nil {
 		return nil, err
 	}
 
-	// tr is the remote track that matches the request.
-	tl, err := TranscodeTrackRemote(matched.Parent, matched.TrackRemote, outputCodec)
+	tl, err := webrtc.NewTrackLocalStaticRTP(transcoder.OutputCodec(), matched.TrackRemote.ID(), matched.TrackRemote.StreamID())
 	if err != nil {
 		return nil, err
 	}
+
+	go func() {
+		for {
+			p, _, err := matched.TrackRemote.ReadRTP()
+			if err != nil {
+				return
+			}
+			if err := transcoder.WriteRTP(p); err != nil {
+				return
+			}
+		}
+	}()
+	go rtpio.CopyRTP(tl, transcoder)
 
 	rtpSender, err := matched.PeerConnection.AddTrack(tl)
 	if err != nil {

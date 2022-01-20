@@ -94,13 +94,13 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	
+
 	go processRTCP(rtpSender)
 
 	// Set a handler for when a new remote track starts
 	peerConnection.OnTrack(func(trackRemote *webrtc.TrackRemote, receiver *webrtc.RTPReceiver) {
 		fmt.Printf("on track %s (%s)\n", trackRemote.ID(), trackRemote.Codec().MimeType)
-		
+
 		// Create a new TrackLocal
 		trackLocal, err := webrtc.NewTrackLocalStaticRTP(trackRemote.Codec().RTPCodecCapability, trackRemote.ID(), trackRemote.StreamID())
 		if err != nil {
