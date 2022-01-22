@@ -6,12 +6,23 @@ package gst
 #include <gst/gst.h>
 #include <gst/app/gstappsrc.h>
 #include <gst/app/gstappsink.h>
+
+gpointer compat_memdup(gconstpointer mem, gsize byte_size) {
+#if GLIB_CHECK_VERSION(2, 68, 0)
+    return g_memdup2(mem, byte_size);
+#else
+    return g_memdup(mem, byte_size);
+#endif
+}
 */
 import "C"
 import (
 	"errors"
 	"fmt"
+	"io"
 	"unsafe"
+
+	"github.com/pion/rtp"
 )
 
 type Element struct {
@@ -38,7 +49,7 @@ func (e *Element) PushBuffer(data []byte) (err error) {
 	b := C.CBytes(data)
 	defer C.free(b)
 
-	p := C.g_memdup2(C.gconstpointer(b), C.ulong(len(data)))
+	p := C.compat_memdup(C.gconstpointer(b), C.ulong(len(data)))
 	cdata := C.gst_buffer_new_wrapped(p, C.ulong(len(data)))
 
 	gstReturn := C.gst_app_src_push_buffer((*C.GstAppSrc)(unsafe.Pointer(e.GstElement)), cdata)
@@ -99,4 +110,32 @@ func (e *Element) PullSample() (sample *Sample, err error) {
 func (e *Element) IsEOS() bool {
 	Cbool := C.gst_app_sink_is_eos((*C.GstAppSink)(unsafe.Pointer(e.GstElement)))
 	return Cbool == 1
+}
+
+func (e *Element) WriteRTP(p *rtp.Packet) error {
+	buf, err := p.Marshal()
+	if err != nil {
+		return err
+	}
+	return e.PushBuffer(buf)
+}
+
+func (e *Element) ReadRTP() (*rtp.Packet, error) {
+	sample, err := e.PullSample()
+	if err != nil {
+		if e.IsEOS() {
+			return nil, io.EOF
+		}
+		return nil, err
+	}
+
+	p := &rtp.Packet{}
+	if err := p.Unmarshal(sample.Data); err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
+func (e *Element) Close() error {
+	return e.EndOfStream()
 }

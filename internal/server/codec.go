@@ -39,7 +39,7 @@ var SupportedCodecs = map[string]GStreamerParameters{
 	webrtc.MimeTypeVP9: {"VP9", "rtpvp9depay", "vp9enc deadline=1", "rtpvp9pay"},
 	webrtc.MimeTypeAV1: {"AV1", "rtpav1depay", "av1enc deadline=1", "rtpav1pay"},
 
-	webrtc.MimeTypeOpus: {"OPUS", "rtpopusdepay", "opusenc", "rtpopuspay"},
+	webrtc.MimeTypeOpus: {"OPUS", "rtpopusdepay", "opusenc inband-fec=true", "rtpopuspay"},
 	"audio/aac": {"MP4A-LATM", "rtpmp4adepay", "avenc_aac", "rtpmp4apay"},
 	"audio/mpeg": {"MPEG", "rtpmpadepay", "lamemp3enc", "rtpmpapay"},
 	"audio/speex": {"SPEEX", "rtpspeexdepay", "speexenc", "rtpspeexpay"},
@@ -50,7 +50,7 @@ var SupportedCodecs = map[string]GStreamerParameters{
 	"audio/vorbis": {"VORBIS", "rtpvorbisdepay", "vorbisenc", "rtpvorbispay"},
 }
 
-func PipelineString(from, to webrtc.RTPCodecCapability, encoder string) (string, error) {
+func PipelineString(from webrtc.RTPCodecParameters, to webrtc.RTPCodecCapability, encoder string) (string, error) {
 	fromParameters, ok := SupportedCodecs[from.MimeType]
 	if !ok {
 		return "", fmt.Errorf("unsupported codec %s", from.MimeType)
@@ -72,12 +72,12 @@ func PipelineString(from, to webrtc.RTPCodecCapability, encoder string) (string,
 			"appsrc format=time name=source ! %s ! rtpjitterbuffer ! %s ! queue ! decodebin ! queue ! videoconvert ! %s ! queue ! %s ! %s ! appsink name=sink",
 			inputCaps, fromParameters.Depayloader, encoder, toParameters.Payloader, outputCaps), nil
 	} else if strings.HasPrefix(from.MimeType, "audio") {
-		inputCaps := fmt.Sprintf("application/x-rtp,media=(string)audio,encoding-name=(string)%s,clock-rate=(int)%d", fromParameters.EncodingName, from.ClockRate)
+		inputCaps := fmt.Sprintf("application/x-rtp,media=(string)audio,encoding-name=(string)%s,clock-rate=(int)%d,payload=(int)%d", fromParameters.EncodingName, from.ClockRate, from.PayloadType)
 		// outputCaps := fmt.Sprintf("application/x-rtp,media=(string)audio,encoding-name=(string)%s,clock-rate=(int)%d", toParameters.EncodingName, to.ClockRate)
 
 		return fmt.Sprintf(
-			"appsrc format=time name=source ! %s ! rtpjitterbuffer ! %s ! queue ! decodebin ! queue ! audioconvert ! audioresample ! %s ! queue ! %s ! appsink name=sink",
-			inputCaps, fromParameters.Depayloader, encoder, toParameters.Payloader), nil
+			"appsrc format=time name=source ! %s ! rtpjitterbuffer ! %s ! queue ! decodebin ! queue ! audioconvert ! audioresample ! %s ! %s pt=96 ! appsink name=sink",
+			inputCaps, fromParameters.Depayloader, toParameters.DefaultEncoder, toParameters.Payloader), nil
 	}
 	return "", fmt.Errorf("unsupported codec %s", from.MimeType)
 }

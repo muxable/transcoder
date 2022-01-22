@@ -2,18 +2,20 @@ package transcode
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"strings"
 
-	"github.com/muxable/rtpio/pkg/rtpio"
 	"github.com/muxable/transcoder/internal/gst"
 	"github.com/muxable/transcoder/internal/server"
+	"github.com/pion/rtp"
+	"github.com/pion/rtpio/pkg/rtpio"
 	"github.com/pion/webrtc/v3"
 )
 
 type Transcoder struct {
-	rtpio.RTPWriteCloser
-	rtpio.RTPReader
+	sink rtpio.RTPWriteCloser
+	source rtpio.RTPReader
 
 	synchronizer     *Synchronizer
 	outputMimeType   string
@@ -24,7 +26,7 @@ type Transcoder struct {
 	outputCodec webrtc.RTPCodecCapability
 }
 
-func NewTranscoder(from webrtc.RTPCodecCapability, options ...TranscoderOption) (*Transcoder, error) {
+func NewTranscoder(from webrtc.RTPCodecParameters, options ...TranscoderOption) (*Transcoder, error) {
 	t := &Transcoder{}
 
 	if strings.HasPrefix(from.MimeType, "video") {
@@ -54,8 +56,14 @@ func NewTranscoder(from webrtc.RTPCodecCapability, options ...TranscoderOption) 
 		return nil, err
 	}
 
-	t.RTPWriteCloser = NewSource(bin.GetByName("source"))
-	t.RTPReader = NewSink(bin.GetByName("sink"))
+	source := bin.GetByName("source")
+	sink := bin.GetByName("sink")
+	if source != nil {
+		t.sink = source
+	}
+	if sink != nil {
+		t.source = sink
+	}
 	t.outputCodec = outputCodec
 	if t.synchronizer == nil {
 		pipeline, err := gst.PipelineNew()
@@ -80,6 +88,25 @@ func (t *Transcoder) OutputCodec() webrtc.RTPCodecCapability {
 	return t.outputCodec
 }
 
+func (t *Transcoder) ReadRTP() (*rtp.Packet, error) {
+	if t.source == nil {
+		return nil, io.EOF
+	}
+	p, err := t.source.ReadRTP()
+	if err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
+// WriteRTP writes the RTP packet to the writer if it's present.
+func (t *Transcoder) WriteRTP(p *rtp.Packet) error {
+	if t.sink == nil {
+		return nil
+	}
+	return t.sink.WriteRTP(p)
+}
+
 func (t *Transcoder) Close() error {
 	t.bin.SetState(gst.StateNull)
 
@@ -87,7 +114,11 @@ func (t *Transcoder) Close() error {
 		t.synchronizer.element.Remove(&t.bin.Element)
 	}
 
-	if err := t.RTPWriteCloser.Close(); err != nil {
+	if t.sink == nil {
+		return nil
+	}
+
+	if err := t.sink.Close(); err != nil {
 		return err
 	}
 

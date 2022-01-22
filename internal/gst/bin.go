@@ -39,18 +39,17 @@ func ParseBinFromDescription(binStr string) (bin *Bin, err error) {
 	return
 }
 
-func (b *Bin) GetByName(name string) (element *Element) {
+func (b *Bin) GetByName(name string) (*Element) {
 	n := (*C.gchar)(unsafe.Pointer(C.CString(name)))
 	defer C.g_free(C.gpointer(unsafe.Pointer(n)))
 	CElement := C.gst_bin_get_by_name((*C.GstBin)(unsafe.Pointer(b.GstElement)), n)
 
 	if CElement == nil {
-		return
+		return nil
 	}
-	element = &Element{
+	return &Element{
 		GstElement: CElement,
 	}
-	return
 }
 
 func (b *Bin) Add(child *Element) {

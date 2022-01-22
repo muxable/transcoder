@@ -5,10 +5,10 @@ import (
 	"encoding/json"
 	"sync"
 
-	"github.com/muxable/rtpio/pkg/rtpio"
 	"github.com/muxable/transcoder/api"
 	"github.com/muxable/transcoder/internal/peerconnection"
 	"github.com/muxable/transcoder/pkg/transcode"
+	"github.com/pion/rtpio/pkg/rtpio"
 	"github.com/pion/webrtc/v3"
 	"go.uber.org/zap"
 )
@@ -185,7 +185,7 @@ func (s *TranscoderServer) Transcode(ctx context.Context, request *api.Transcode
 	}
 
 	// tr is the remote track that matches the request.
-	transcoder, err := transcode.NewTranscoder(matched.TrackRemote.Codec().RTPCodecCapability,
+	transcoder, err := transcode.NewTranscoder(matched.TrackRemote.Codec(),
 		transcode.WithSynchronizer(matched.Synchronizer),
 		transcode.ToMimeType(request.MimeType),
 		transcode.ViaGStreamerEncoder(request.GstreamerPipeline))

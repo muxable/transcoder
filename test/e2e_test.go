@@ -1,26 +1,15 @@
 package test
 
 import (
-	"io"
-	"log"
-	"os"
 	"strings"
 	"sync"
 	"testing"
-	"time"
 
-	"github.com/muxable/rtpio/pkg/rtpio"
 	"github.com/muxable/transcoder/internal/gst"
 	"github.com/muxable/transcoder/internal/server"
 	"github.com/muxable/transcoder/pkg/transcode"
-	"github.com/pion/rtp"
-	"github.com/pion/rtp/codecs"
+	"github.com/pion/rtpio/pkg/rtpio"
 	"github.com/pion/webrtc/v3"
-	"github.com/pion/webrtc/v3/pkg/media/oggreader"
-)
-
-const (
-	oggPageDuration = time.Millisecond * 20
 )
 
 func writer(s string) (*gst.Element, error) {
@@ -38,6 +27,23 @@ func writer(s string) (*gst.Element, error) {
 	bin.SetState(gst.StatePlaying)
 
 	return bin.GetByName("source"), nil
+}
+
+func reader(s string) (*gst.Element, error) {
+	pipeline, err := gst.PipelineNew()
+	if err != nil {
+		return nil, err
+	}
+	bin, err := gst.ParseBinFromDescription(s)
+	if err != nil {
+		return nil, err
+	}
+
+	pipeline.SetState(gst.StatePlaying)
+	pipeline.Add(&bin.Element)
+	bin.SetState(gst.StatePlaying)
+
+	return bin.GetByName("sink"), nil
 }
 
 // func TestTranscodingVP8ToAny(t *testing.T) {
@@ -119,73 +125,36 @@ func TestTranscodingOggToAny(t *testing.T) {
 			continue
 		}
 
-		tc, err := transcode.NewTranscoder(webrtc.RTPCodecCapability{
+		tc, err := transcode.NewTranscoder(webrtc.RTPCodecParameters{
+			RTPCodecCapability: webrtc.RTPCodecCapability{
 			MimeType:  webrtc.MimeTypeOpus,
 			ClockRate: 48000,
+			},
+			PayloadType: 96,
 		}, transcode.ToMimeType(mime))
 		if err != nil {
 			t.Errorf("failed to create transcoder: %v", err)
 			continue
 		}
 
-		log.Printf("creating writer %s", codec)
-		// writer, err := writer(fmt.Sprintf("appsrc format=time name=source ! application/x-rtp,encoding-name=(string)%s ! %s ! filesink location=output.%s", codec.EncodingName, codec.Depayloader, codec.EncodingName))
-		writer, err := writer("appsrc format=time name=source ! fakesink dump=true")
+		reader, err := reader("filesrc location=input.ogg ! oggdemux ! rtpopuspay pt=96 ! appsink name=sink")
 		if err != nil {
 			t.Errorf("failed to create bin: %v", err)
 		}
-		log.Printf("writing")
-
-		file, oggErr := os.Open("input.ogg")
-		if oggErr != nil {
-			t.Errorf("failed to open input file: %v", oggErr)
-			continue
+		writer, err := writer("appsrc format=time name=source ! application/x-rtp,encoding-name=(string)OPUS,clock-rate=(int)48000,payload=(int)96 ! rtpopusdepay ! queue ! decodebin ! autoaudiosink")
+		if err != nil {
+			t.Errorf("failed to create bin: %v", err)
 		}
-
-		// Open on oggfile in non-checksum mode.
-		ogg, _, oggErr := oggreader.NewWith(file)
-		if oggErr != nil {
-			t.Errorf("failed to read OGG file: %v", oggErr)
-			continue
-		}
-
-		// Keep track of last granule, the difference is the amount of samples in the buffer
-		var lastGranule uint64
-
-		packetizer := rtp.NewPacketizer(1200, 96, 0, &codecs.OpusPayloader{}, rtp.NewRandomSequencer(), 90000)
-
+		
 		wg.Add(2)
-
 		go func() {
-			defer wg.Done()
-			defer tc.Close()
-			ticker := time.NewTicker(oggPageDuration)
-			for range ticker.C {
-				pageData, pageHeader, oggErr := ogg.ParseNextPage()
-				if oggErr == io.EOF {
-					return
-				}
-
-				if oggErr != nil {
-					t.Errorf("failed to read OGG page: %v", oggErr)
-					continue
-				}
-
-				// The amount of samples is the difference between the last and current timestamp
-				sampleCount := uint32(pageHeader.GranulePosition - lastGranule)
-				lastGranule = pageHeader.GranulePosition
-
-				for _, p := range packetizer.Packetize(pageData, sampleCount) {
-					if err := tc.WriteRTP(p); err != nil {
-						t.Errorf("failed to write sample: %v", err)
-					}
-				}
-			}
+			rtpio.CopyRTP(tc, reader)
+			tc.Close()
+			wg.Done()
 		}()
-
-		src := transcode.NewSource(writer)
 		go func() {
-			rtpio.CopyRTP(src, tc)
+			rtpio.CopyRTP(writer, tc)
+			writer.Close()
 			wg.Done()
 		}()
 	}
