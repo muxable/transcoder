@@ -1,6 +1,8 @@
 package test
 
 import (
+	"fmt"
+	"log"
 	"strings"
 	"sync"
 	"testing"
@@ -116,36 +118,32 @@ func reader(s string) (*gst.Element, error) {
 // }
 
 func TestTranscodingOggToAny(t *testing.T) {
-	var wg sync.WaitGroup
 	for mime, codec := range server.SupportedCodecs {
-		if mime != webrtc.MimeTypeOpus {
-			continue
-		}
 		if !strings.HasPrefix(mime, "audio") {
 			continue
 		}
+		log.Printf("ATTEMPTING %s", mime)
 
-		tc, err := transcode.NewTranscoder(webrtc.RTPCodecParameters{
-			RTPCodecCapability: webrtc.RTPCodecCapability{
-			MimeType:  webrtc.MimeTypeOpus,
-			ClockRate: 48000,
-			},
-			PayloadType: 96,
-		}, transcode.ToMimeType(mime))
+		outputCodec := server.DefaultOutputCodecs[mime]
+
+		tc, err := transcode.NewTranscoder(
+			server.DefaultOutputCodecs[webrtc.MimeTypeOpus],
+			transcode.ToOutputCodec(outputCodec))
 		if err != nil {
 			t.Errorf("failed to create transcoder: %v", err)
 			continue
 		}
 
-		reader, err := reader("filesrc location=input.ogg ! oggdemux ! rtpopuspay pt=96 ! appsink name=sink")
+		reader, err := reader(fmt.Sprintf("filesrc location=input.ogg ! oggdemux ! rtpopuspay pt=%d ! appsink name=sink", server.DefaultOutputCodecs[webrtc.MimeTypeOpus].PayloadType))
 		if err != nil {
 			t.Errorf("failed to create bin: %v", err)
 		}
-		writer, err := writer("appsrc format=time name=source ! application/x-rtp,encoding-name=(string)OPUS,clock-rate=(int)48000,payload=(int)96 ! rtpopusdepay ! queue ! decodebin ! autoaudiosink")
+		writer, err := writer(fmt.Sprintf("appsrc format=time is-live=true name=source ! application/x-rtp,%s ! %s ! queue ! decodebin ! autoaudiosink", codec.ToCaps(outputCodec), codec.Depayloader))
 		if err != nil {
 			t.Errorf("failed to create bin: %v", err)
 		}
-		
+
+		var wg sync.WaitGroup
 		wg.Add(2)
 		go func() {
 			rtpio.CopyRTP(tc, reader)
@@ -157,6 +155,6 @@ func TestTranscodingOggToAny(t *testing.T) {
 			writer.Close()
 			wg.Done()
 		}()
+		wg.Wait()
 	}
-	wg.Wait()
 }

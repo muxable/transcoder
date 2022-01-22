@@ -3,7 +3,6 @@ package transcode
 import (
 	"fmt"
 	"io"
-	"log"
 	"strings"
 
 	"github.com/muxable/transcoder/internal/gst"
@@ -18,38 +17,36 @@ type Transcoder struct {
 	source rtpio.RTPReader
 
 	synchronizer     *Synchronizer
-	outputMimeType   string
 	encodingPipeline string
 
 	bin *gst.Bin
 
-	outputCodec webrtc.RTPCodecCapability
+	outputCodec *webrtc.RTPCodecParameters
 }
 
 func NewTranscoder(from webrtc.RTPCodecParameters, options ...TranscoderOption) (*Transcoder, error) {
 	t := &Transcoder{}
 
-	if strings.HasPrefix(from.MimeType, "video") {
-		t.outputMimeType = "video"
-	} else if strings.HasPrefix(from.MimeType, "audio") {
-		t.outputMimeType = "audio"
-	}
-
 	for _, option := range options {
 		option(t)
 	}
 
-	outputCodec, ok := server.DefaultOutputCodecs[t.outputMimeType]
-	if !ok {
-		return nil, fmt.Errorf("unsupported output codec: %s", t.outputMimeType)
+	if t.outputCodec == nil {
+		if strings.HasPrefix(from.MimeType, "video") {
+			codec := server.DefaultOutputCodecs[webrtc.MimeTypeH264]
+			t.outputCodec = &codec
+		} else if strings.HasPrefix(from.MimeType, "audio") {
+			codec := server.DefaultOutputCodecs[webrtc.MimeTypeOpus]
+			t.outputCodec = &codec
+		} else {
+			return nil, fmt.Errorf("unsupported codec: %s", from.MimeType)
+		}
 	}
 
-	transcodingPipelineStr, err := server.PipelineString(from, outputCodec, t.encodingPipeline)
+	transcodingPipelineStr, err := server.PipelineString(from, *t.outputCodec, t.encodingPipeline)
 	if err != nil {
 		return nil, err
 	}
-
-	log.Printf("creating pipeline: %s", transcodingPipelineStr)
 
 	bin, err := gst.ParseBinFromDescription(transcodingPipelineStr)
 	if err != nil {
@@ -64,7 +61,6 @@ func NewTranscoder(from webrtc.RTPCodecParameters, options ...TranscoderOption) 
 	if sink != nil {
 		t.source = sink
 	}
-	t.outputCodec = outputCodec
 	if t.synchronizer == nil {
 		pipeline, err := gst.PipelineNew()
 		if err != nil {
@@ -84,8 +80,8 @@ func NewTranscoder(from webrtc.RTPCodecParameters, options ...TranscoderOption) 
 	return t, nil
 }
 
-func (t *Transcoder) OutputCodec() webrtc.RTPCodecCapability {
-	return t.outputCodec
+func (t *Transcoder) OutputCodec() webrtc.RTPCodecParameters {
+	return *t.outputCodec
 }
 
 func (t *Transcoder) ReadRTP() (*rtp.Packet, error) {
@@ -133,9 +129,9 @@ func WithSynchronizer(s *Synchronizer) TranscoderOption {
 	}
 }
 
-func ToMimeType(mimeType string) TranscoderOption {
+func ToOutputCodec(codec webrtc.RTPCodecParameters) TranscoderOption {
 	return func(t *Transcoder) {
-		t.outputMimeType = mimeType
+		t.outputCodec = &codec
 	}
 }
 
