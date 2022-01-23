@@ -3,6 +3,7 @@ package transcode
 import (
 	"fmt"
 	"io"
+	"log"
 	"strings"
 
 	"github.com/muxable/transcoder/internal/gst"
@@ -47,6 +48,8 @@ func NewTranscoder(from webrtc.RTPCodecParameters, options ...TranscoderOption) 
 	if err != nil {
 		return nil, err
 	}
+
+	log.Printf("%v", transcodingPipelineStr)
 
 	bin, err := gst.ParseBinFromDescription(transcodingPipelineStr)
 	if err != nil {

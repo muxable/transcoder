@@ -208,13 +208,13 @@ func PipelineString(from, to webrtc.RTPCodecParameters, encoder string) (string,
 		inputCaps := fmt.Sprintf("application/x-rtp,media=(string)video,%s", fromParameters.ToCaps(from))
 
 		return fmt.Sprintf(
-			"appsrc format=time is-live=true name=source ! %s ! %s ! queue ! decodebin ! autovideosink",
+			"appsrc format=time name=source ! %s ! %s ! queue ! vp8dec ! autovideosink",
 			inputCaps, fromParameters.Depayloader), nil
 	} else if strings.HasPrefix(from.MimeType, "audio") {
 		inputCaps := fmt.Sprintf("application/x-rtp,media=(string)audio,%s", fromParameters.ToCaps(from))
 
 		return fmt.Sprintf(
-			"appsrc format=time is-live=true name=source ! %s ! %s ! queue ! decodebin ! queue ! audioconvert ! audioresample ! %s ! %s mtu=1200 ! appsink name=sink sync=false async=false",
+			"appsrc format=time name=source ! %s ! %s ! queue ! decodebin ! queue ! audioconvert ! audioresample ! %s ! %s mtu=1200 ! appsink name=sink sync=false async=false",
 			inputCaps, fromParameters.Depayloader, encoder, toParameters.Payloader), nil
 	}
 	return "", fmt.Errorf("unsupported codec %s", from.MimeType)
