@@ -18,8 +18,8 @@ gpointer compat_memdup(gconstpointer mem, gsize byte_size) {
 import "C"
 import (
 	"errors"
-	"fmt"
-	"io"
+	"log"
+	"runtime"
 	"unsafe"
 
 	"github.com/pion/rtp"
@@ -45,66 +45,30 @@ func (e *Element) EndOfStream() (err error) {
 	return
 }
 
-func (e *Element) PushBuffer(data []byte) (err error) {
-	b := C.CBytes(data)
-	defer C.free(b)
+func (e *Element) PushSample(s *Sample) error {
+	gstReturn := C.gst_app_src_push_sample((*C.GstAppSrc)(unsafe.Pointer(e.GstElement)), s.GstSample)
 
-	p := C.compat_memdup(C.gconstpointer(b), C.ulong(len(data)))
-	cdata := C.gst_buffer_new_wrapped(p, C.ulong(len(data)))
-
-	gstReturn := C.gst_app_src_push_buffer((*C.GstAppSrc)(unsafe.Pointer(e.GstElement)), cdata)
-
+	log.Printf("%v", gstReturn)
 	if gstReturn != C.GST_FLOW_OK {
-		err = errors.New("could not push buffer on appsrc element")
-		return
+		return errors.New("could not push buffer on appsrc element")
 	}
-
-	return
+	return nil
 }
 
-func (e *Element) PullSample() (sample *Sample, err error) {
+func (e *Element) PullSample() (*Sample, error) {
 	CGstSample := C.gst_app_sink_pull_sample((*C.GstAppSink)(unsafe.Pointer(e.GstElement)))
 	if CGstSample == nil {
-		err = errors.New("could not pull a sample from appsink")
-		return
+		return nil, errors.New("could not pull a sample from appsink")
 	}
 
-	gstBuffer := C.gst_sample_get_buffer(CGstSample)
+	s := &Sample{}
+	s.GstSample = CGstSample
 
-	if gstBuffer == nil {
-		err = errors.New("could not pull a sample from appsink")
-		return
-	}
+	runtime.SetFinalizer(s, func(s *Sample) {
+		C.gst_object_unref(C.gpointer(unsafe.Pointer(s.GstSample)))
+	})
 
-	mapInfo := (*C.GstMapInfo)(unsafe.Pointer(C.malloc(C.sizeof_GstMapInfo)))
-	defer C.free(unsafe.Pointer(mapInfo))
-
-	if int(C.gst_buffer_map(gstBuffer, mapInfo, C.GST_MAP_READ)) == 0 {
-		err = fmt.Errorf("could not map gstBuffer %#v", gstBuffer)
-		return
-	}
-
-	CData := (*[1 << 30]byte)(unsafe.Pointer(mapInfo.data))
-	data := make([]byte, int(mapInfo.size))
-	copy(data, CData[:])
-
-	duration := uint64((*C.GstBuffer)(unsafe.Pointer(gstBuffer)).duration)
-	pts := uint64((*C.GstBuffer)(unsafe.Pointer(gstBuffer)).pts)
-	dts := uint64((*C.GstBuffer)(unsafe.Pointer(gstBuffer)).dts)
-	offset := uint64((*C.GstBuffer)(unsafe.Pointer(gstBuffer)).offset)
-
-	sample = &Sample{
-		Data:     data,
-		Duration: duration,
-		Pts:      pts,
-		Dts:      dts,
-		Offset:   offset,
-	}
-
-	C.gst_buffer_unmap(gstBuffer, mapInfo)
-	C.gst_sample_unref(CGstSample)
-
-	return
+	return s, nil
 }
 
 func (e *Element) IsEOS() bool {
@@ -113,27 +77,29 @@ func (e *Element) IsEOS() bool {
 }
 
 func (e *Element) WriteRTP(p *rtp.Packet) error {
-	buf, err := p.Marshal()
-	if err != nil {
-		return err
-	}
-	return e.PushBuffer(buf)
+	// buf, err := p.Marshal()
+	// if err != nil {
+	// 	return err
+	// }
+	// return e.PushBuffer(buf)
+	return nil
 }
 
 func (e *Element) ReadRTP() (*rtp.Packet, error) {
-	sample, err := e.PullSample()
-	if err != nil {
-		if e.IsEOS() {
-			return nil, io.EOF
-		}
-		return nil, err
-	}
+	return nil, nil
+	// sample, err := e.PullSample()
+	// if err != nil {
+	// 	if e.IsEOS() {
+	// 		return nil, io.EOF
+	// 	}
+	// 	return nil, err
+	// }
 
-	p := &rtp.Packet{}
-	if err := p.Unmarshal(sample.Data); err != nil {
-		return nil, err
-	}
-	return p, nil
+	// p := &rtp.Packet{}
+	// if err := p.Unmarshal(sample.Data); err != nil {
+	// 	return nil, err
+	// }
+	// return p, nil
 }
 
 func (e *Element) Close() error {

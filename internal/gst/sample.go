@@ -1,9 +1,10 @@
 package gst
 
+/*
+#cgo pkg-config: gstreamer-1.0
+#include <gst/gst.h>
+*/
+import "C"
 type Sample struct {
-	Data     []byte
-	Duration uint64
-	Pts      uint64
-	Dts      uint64
-	Offset   uint64
+	GstSample *C.GstSample
 }
