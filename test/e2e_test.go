@@ -82,11 +82,11 @@ func TestTranscoding(t *testing.T) {
 			var rs, ws string
 			if strings.HasPrefix(mime, "audio") {
 				ic = server.DefaultOutputCodecs[webrtc.MimeTypeOpus]
-				rs = fmt.Sprintf("audiotestsrc num-buffers=100 ! opusenc ! rtpopuspay pt=%d mtu=1200 ! appsink name=sink", server.DefaultOutputCodecs[webrtc.MimeTypeOpus].PayloadType)
+				rs = fmt.Sprintf("audiotestsrc num-buffers=10 ! opusenc ! rtpopuspay pt=%d mtu=1200 ! appsink name=sink", server.DefaultOutputCodecs[webrtc.MimeTypeOpus].PayloadType)
 				ws = fmt.Sprintf("appsrc format=time name=source ! application/x-rtp,%s ! %s ! queue ! decodebin ! audioconvert ! testsink name=test", codec.ToCaps(oc), codec.Depayloader)
 			} else {
 				ic = server.DefaultOutputCodecs[webrtc.MimeTypeVP8]
-				rs = fmt.Sprintf("videotestsrc num-buffers=100 ! vp8enc ! rtpvp8pay pt=%d mtu=1200 ! appsink name=sink", server.DefaultOutputCodecs[webrtc.MimeTypeVP8].PayloadType)
+				rs = fmt.Sprintf("videotestsrc num-buffers=10 ! vp8enc ! rtpvp8pay pt=%d mtu=1200 ! appsink name=sink", server.DefaultOutputCodecs[webrtc.MimeTypeVP8].PayloadType)
 				ws = fmt.Sprintf("appsrc format=time name=source ! application/x-rtp,%s ! %s ! queue ! decodebin ! videoconvert ! testsink name=test", codec.ToCaps(oc), codec.Depayloader)
 			}
 

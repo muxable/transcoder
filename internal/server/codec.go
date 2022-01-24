@@ -14,93 +14,93 @@ import (
 var DefaultOutputCodecs = map[string]webrtc.RTPCodecParameters{
 	webrtc.MimeTypePCMU: {
 		RTPCodecCapability: webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypePCMU, ClockRate: 8000, Channels: 1},
-		PayloadType: 0,
+		PayloadType:        0,
 	},
 	"audio/GSM": {
 		RTPCodecCapability: webrtc.RTPCodecCapability{MimeType: "audio/GSM", ClockRate: 8000, Channels: 1},
-		PayloadType: 3,
+		PayloadType:        3,
 	},
 	"audio/G723": {
 		RTPCodecCapability: webrtc.RTPCodecCapability{MimeType: "audio/G723", ClockRate: 8000, Channels: 1},
-		PayloadType: 4,
+		PayloadType:        4,
 	},
 	"audio/LPC": {
 		RTPCodecCapability: webrtc.RTPCodecCapability{MimeType: "audio/LPC", ClockRate: 8000, Channels: 1},
-		PayloadType: 7,
+		PayloadType:        7,
 	},
 	webrtc.MimeTypePCMA: {
 		RTPCodecCapability: webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypePCMA, ClockRate: 8000, Channels: 1},
-		PayloadType: 8,
+		PayloadType:        8,
 	},
 	webrtc.MimeTypeG722: {
 		RTPCodecCapability: webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeG722, ClockRate: 8000, Channels: 1},
-		PayloadType: 9,
+		PayloadType:        9,
 	},
 	"audio/L16": {
 		RTPCodecCapability: webrtc.RTPCodecCapability{MimeType: "audio/L16", ClockRate: 44100, Channels: 2},
-		PayloadType: 10,
+		PayloadType:        10,
 	},
 	"audio/QCELP": {
 		RTPCodecCapability: webrtc.RTPCodecCapability{MimeType: "audio/QCELP", ClockRate: 8000, Channels: 1},
-		PayloadType: 12,
+		PayloadType:        12,
 	},
 	"audio/CN": {
 		RTPCodecCapability: webrtc.RTPCodecCapability{MimeType: "audio/CN", ClockRate: 8000, Channels: 1},
-		PayloadType: 13,
+		PayloadType:        13,
 	},
 	"audio/MPA": {
 		RTPCodecCapability: webrtc.RTPCodecCapability{MimeType: "audio/MPA", ClockRate: 90000, Channels: 1},
-		PayloadType: 14,
+		PayloadType:        14,
 	},
 	"audio/G728": {
 		RTPCodecCapability: webrtc.RTPCodecCapability{MimeType: "audio/G728", ClockRate: 8000, Channels: 1},
-		PayloadType: 15,
+		PayloadType:        15,
 	},
 	"audio/DVI4": {
 		RTPCodecCapability: webrtc.RTPCodecCapability{MimeType: "audio/DVI4", ClockRate: 22050, Channels: 1},
-		PayloadType: 17,
+		PayloadType:        17,
 	},
 	"audio/G729": {
 		RTPCodecCapability: webrtc.RTPCodecCapability{MimeType: "audio/G729", ClockRate: 8000, Channels: 1},
-		PayloadType: 18,
+		PayloadType:        18,
 	},
 
 	webrtc.MimeTypeVP8: {
 		RTPCodecCapability: webrtc.RTPCodecCapability{
-			MimeType: webrtc.MimeTypeVP8,
-			ClockRate: 90000,
+			MimeType:     webrtc.MimeTypeVP8,
+			ClockRate:    90000,
 			RTCPFeedback: []webrtc.RTCPFeedback{{Type: "goog-remb", Parameter: ""}, {Type: "ccm", Parameter: "fir"}, {Type: "nack", Parameter: ""}, {Type: "nack", Parameter: "pli"}},
 		},
 		PayloadType: 100,
 	},
 	webrtc.MimeTypeVP9: {
 		RTPCodecCapability: webrtc.RTPCodecCapability{
-			MimeType: webrtc.MimeTypeVP9,
-			ClockRate: 90000,
+			MimeType:     webrtc.MimeTypeVP9,
+			ClockRate:    90000,
 			RTCPFeedback: []webrtc.RTCPFeedback{{Type: "goog-remb", Parameter: ""}, {Type: "ccm", Parameter: "fir"}, {Type: "nack", Parameter: ""}, {Type: "nack", Parameter: "pli"}},
 		},
 		PayloadType: 101,
 	},
 	webrtc.MimeTypeH264: {
 		RTPCodecCapability: webrtc.RTPCodecCapability{
-			MimeType: webrtc.MimeTypeH264,
-			ClockRate: 90000,
+			MimeType:     webrtc.MimeTypeH264,
+			ClockRate:    90000,
 			RTCPFeedback: []webrtc.RTCPFeedback{{Type: "goog-remb", Parameter: ""}, {Type: "ccm", Parameter: "fir"}, {Type: "nack", Parameter: ""}, {Type: "nack", Parameter: "pli"}},
 		},
 		PayloadType: 102,
 	},
 	webrtc.MimeTypeH265: {
 		RTPCodecCapability: webrtc.RTPCodecCapability{
-			MimeType: webrtc.MimeTypeH265,
-			ClockRate: 90000,
+			MimeType:     webrtc.MimeTypeH265,
+			ClockRate:    90000,
 			RTCPFeedback: []webrtc.RTCPFeedback{{Type: "goog-remb", Parameter: ""}, {Type: "ccm", Parameter: "fir"}, {Type: "nack", Parameter: ""}, {Type: "nack", Parameter: "pli"}},
 		},
 		PayloadType: 103,
 	},
 	webrtc.MimeTypeAV1: {
 		RTPCodecCapability: webrtc.RTPCodecCapability{
-			MimeType: webrtc.MimeTypeAV1,
-			ClockRate: 90000,
+			MimeType:     webrtc.MimeTypeAV1,
+			ClockRate:    90000,
 			RTCPFeedback: []webrtc.RTCPFeedback{{Type: "goog-remb", Parameter: ""}, {Type: "ccm", Parameter: "fir"}, {Type: "nack", Parameter: ""}, {Type: "nack", Parameter: "pli"}},
 		},
 		PayloadType: 104,
@@ -108,28 +108,29 @@ var DefaultOutputCodecs = map[string]webrtc.RTPCodecParameters{
 
 	webrtc.MimeTypeOpus: {
 		RTPCodecCapability: webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeOpus, ClockRate: 48000, Channels: 2},
-		PayloadType: 111,
+		PayloadType:        111,
 	},
 	"audio/AC3": {
 		RTPCodecCapability: webrtc.RTPCodecCapability{MimeType: "audio/AC3", ClockRate: 48000, Channels: 1},
-		PayloadType: 112,
+		PayloadType:        112,
 	},
 	"audio/VORBIS": {
 		RTPCodecCapability: webrtc.RTPCodecCapability{MimeType: "audio/VORBIS", ClockRate: 90000, Channels: 1},
-		PayloadType: 113,
+		PayloadType:        113,
 	},
 	"audio/AAC": {
 		RTPCodecCapability: webrtc.RTPCodecCapability{MimeType: "audio/AAC", ClockRate: 48000, Channels: 2},
-		PayloadType: 114,
+		PayloadType:        114,
 	},
 	"audio/SPEEX": {
 		RTPCodecCapability: webrtc.RTPCodecCapability{MimeType: "audio/SPEEX", ClockRate: 48000, Channels: 1},
-		PayloadType: 115,
+		PayloadType:        115,
 	},
 }
+
 type GStreamerParameters struct {
 	Depayloader, DefaultEncoder, Payloader string
-	ToCaps func(webrtc.RTPCodecParameters) string
+	ToCaps                                 func(webrtc.RTPCodecParameters) string
 }
 type CodecMapping struct {
 	GStreamerParameters
@@ -223,7 +224,7 @@ func PipelineString(from, to webrtc.RTPCodecParameters, encoder string) (string,
 	if encoder == "" {
 		encoder = toParameters.DefaultEncoder
 	}
-	
+
 	if strings.HasPrefix(from.MimeType, "video") {
 		inputCaps := fmt.Sprintf("application/x-rtp,media=(string)video,%s", fromParameters.ToCaps(from))
 
