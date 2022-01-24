@@ -14,10 +14,40 @@ gpointer compat_memdup(gconstpointer mem, gsize byte_size) {
     return g_memdup(mem, byte_size);
 #endif
 }
+
+// strange that cgo doesn't like these inlined...
+void X_gst_g_object_set_string(GstElement *e, const gchar* p_name, gchar* p_value) {
+  g_object_set(G_OBJECT(e), p_name, p_value, NULL);
+}
+
+void X_gst_g_object_set_int(GstElement *e, const gchar* p_name, gint p_value) {
+  g_object_set(G_OBJECT(e), p_name, p_value, NULL);
+}
+
+void X_gst_g_object_set_uint(GstElement *e, const gchar* p_name, guint p_value) {
+  g_object_set(G_OBJECT(e), p_name, p_value, NULL);
+}
+
+void X_gst_g_object_set_bool(GstElement *e, const gchar* p_name, gboolean p_value) {
+  g_object_set(G_OBJECT(e), p_name, p_value, NULL);
+}
+
+void X_gst_g_object_set_gdouble(GstElement *e, const gchar* p_name, gdouble p_value) {
+  g_object_set(G_OBJECT(e), p_name, p_value, NULL);
+}
+
+void X_gst_g_object_set_caps(GstElement *e, const gchar* p_name, const GstCaps *p_value) {
+  g_object_set(G_OBJECT(e), p_name, p_value, NULL);
+}
+
+void X_gst_g_object_set_structure(GstElement *e, const gchar* p_name, const GstStructure *p_value) {
+  g_object_set(G_OBJECT(e), p_name, p_value, NULL);
+}
 */
 import "C"
 import (
 	"errors"
+	"fmt"
 	"io"
 	"unsafe"
 
@@ -28,23 +58,57 @@ type Element struct {
 	GstElement *C.GstElement
 }
 
-func FactoryElementMake(s string) (*Element, error) {
+func NewElement(s string, properties ...Property) (*Element, error) {
 	cs := C.CString(s)
 	defer C.free(unsafe.Pointer(cs))
 	CGstElement := C.gst_element_factory_make(cs, nil)
 	if CGstElement == nil {
 		return nil, errors.New("could not create element")
 	}
-	return &Element{GstElement: CGstElement}, nil
+	e := &Element{GstElement: CGstElement}
+	e.Set(properties...)
+	return e, nil
 }
 
 func Link(elements ...*Element) error {
 	for i := 0; i < len(elements)-1; i++ {
-		if C.gst_element_link(elements[i].GstElement, elements[i+1].GstElement) != C.int(1) {
+		if C.gst_element_link(elements[i].GstElement, elements[i+1].GstElement) != C.gboolean(1) {
 			return errors.New("could not link elements")
 		}
 	}
 	return nil
+}
+
+func (e *Element) Set(properties ...Property) {
+	for _, p := range properties {
+		cname := (*C.gchar)(unsafe.Pointer(C.CString(p.Name)))
+		defer C.g_free(C.gpointer(unsafe.Pointer(cname)))
+		switch value := p.Value.(type) {
+		case string:
+			str := (*C.gchar)(unsafe.Pointer(C.CString(value)))
+			defer C.g_free(C.gpointer(unsafe.Pointer(str)))
+			C.X_gst_g_object_set_string(e.GstElement, cname, str)
+		case int:
+			C.X_gst_g_object_set_int(e.GstElement, cname, C.gint(value))
+		case uint32:
+			C.X_gst_g_object_set_uint(e.GstElement, cname, C.guint(value))
+		case bool:
+			var cvalue int
+			if value {
+				cvalue = 1
+			}
+			C.X_gst_g_object_set_bool(e.GstElement, cname, C.gboolean(cvalue))
+		case float64:
+			C.X_gst_g_object_set_gdouble(e.GstElement, cname, C.gdouble(value))
+		case *Caps:
+			C.X_gst_g_object_set_caps(e.GstElement, cname, value.caps)
+		// case *Structure:
+		// 	structure := value.(*Structure)
+		// 	C.X_gst_g_object_set_structure(e.GstElement, cname, structure.C)
+		default:
+			panic(fmt.Errorf("SetObject: don't know how to set value for type %T", value))
+		}
+	}
 }
 
 func (e *Element) SetState(state StateOptions) StateChangeReturn {

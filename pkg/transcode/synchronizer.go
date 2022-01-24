@@ -11,7 +11,7 @@ type Synchronizer struct {
 }
 
 func NewSynchronizer() (*Synchronizer, error) {
-	pipeline, err := gst.PipelineNew()
+	pipeline, err := gst.NewPipeline()
 	if err != nil {
 		return nil, err
 	}

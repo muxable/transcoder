@@ -25,7 +25,7 @@ func ParseLaunch(s string) (e *Pipeline, err error) {
 	return &Pipeline{Bin: &Bin{Element: &Element{GstElement: gstElt}}}, nil
 }
 
-func PipelineNew() (e *Pipeline, err error) {
+func NewPipeline() (e *Pipeline, err error) {
 	gstElt := C.gst_pipeline_new(nil)
 	if gstElt == nil {
 		return nil, errors.New("could not create a Gstreamer pipeline")

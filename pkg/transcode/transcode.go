@@ -65,7 +65,7 @@ func NewTranscoder(from webrtc.RTPCodecParameters, options ...TranscoderOption) 
 		t.source = sink
 	}
 	if t.synchronizer == nil {
-		pipeline, err := gst.PipelineNew()
+		pipeline, err := gst.NewPipeline()
 		if err != nil {
 			return nil, err
 		}
