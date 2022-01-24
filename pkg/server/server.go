@@ -14,12 +14,6 @@ import (
 	"go.uber.org/zap"
 )
 
-type Source struct {
-	*webrtc.PeerConnection
-	*webrtc.TrackRemote
-	*transcode.Synchronizer
-}
-
 type TranscoderServer struct {
 	api.UnimplementedTranscoderServer
 	config webrtc.Configuration
