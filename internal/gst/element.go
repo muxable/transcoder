@@ -18,8 +18,7 @@ gpointer compat_memdup(gconstpointer mem, gsize byte_size) {
 import "C"
 import (
 	"errors"
-	"log"
-	"runtime"
+	"io"
 	"unsafe"
 
 	"github.com/pion/rtp"
@@ -45,30 +44,50 @@ func (e *Element) EndOfStream() (err error) {
 	return
 }
 
-func (e *Element) PushSample(s *Sample) error {
+func (e *Element) WriteSample(s *Sample) error {
 	gstReturn := C.gst_app_src_push_sample((*C.GstAppSrc)(unsafe.Pointer(e.GstElement)), s.GstSample)
 
-	log.Printf("%v", gstReturn)
 	if gstReturn != C.GST_FLOW_OK {
 		return errors.New("could not push buffer on appsrc element")
 	}
 	return nil
 }
 
-func (e *Element) PullSample() (*Sample, error) {
+func (e *Element) ReadSample() (*Sample, error) {
 	CGstSample := C.gst_app_sink_pull_sample((*C.GstAppSink)(unsafe.Pointer(e.GstElement)))
 	if CGstSample == nil {
 		return nil, errors.New("could not pull a sample from appsink")
 	}
 
-	s := &Sample{}
-	s.GstSample = CGstSample
+	return &Sample{GstSample: CGstSample}, nil
+}
 
-	runtime.SetFinalizer(s, func(s *Sample) {
-		C.gst_object_unref(C.gpointer(unsafe.Pointer(s.GstSample)))
-	})
+func (e *Element) Write(buf []byte) (int, error) {
+	b := C.CBytes(buf)
+	defer C.free(b)
 
-	return s, nil
+	p := C.compat_memdup(C.gconstpointer(b), C.ulong(len(buf)))
+	wrapped := C.gst_buffer_new_wrapped(p, C.ulong(len(buf)))
+
+	if C.gst_app_src_push_buffer((*C.GstAppSrc)(unsafe.Pointer(e.GstElement)), wrapped) != C.GST_FLOW_OK {
+		return 0, errors.New("could not push buffer on appsrc element")
+	}
+
+	return len(buf), nil
+}
+
+func (e *Element) Read(buf []byte) (int, error) {
+	sample, err := e.ReadSample()
+	if err != nil {
+		if e.IsEOS() {
+			return 0, io.EOF
+		}
+		return 0, err
+	}
+	if err := sample.MarshalTo(buf); err != nil {
+		return 0, err
+	}
+	return len(buf), nil
 }
 
 func (e *Element) IsEOS() bool {
@@ -77,29 +96,25 @@ func (e *Element) IsEOS() bool {
 }
 
 func (e *Element) WriteRTP(p *rtp.Packet) error {
-	// buf, err := p.Marshal()
-	// if err != nil {
-	// 	return err
-	// }
-	// return e.PushBuffer(buf)
-	return nil
+	buf, err := p.Marshal()
+	if err != nil {
+		return err
+	}
+	_, err = e.Write(buf)
+	return err
 }
 
 func (e *Element) ReadRTP() (*rtp.Packet, error) {
-	return nil, nil
-	// sample, err := e.PullSample()
-	// if err != nil {
-	// 	if e.IsEOS() {
-	// 		return nil, io.EOF
-	// 	}
-	// 	return nil, err
-	// }
-
-	// p := &rtp.Packet{}
-	// if err := p.Unmarshal(sample.Data); err != nil {
-	// 	return nil, err
-	// }
-	// return p, nil
+	buf := make([]byte, 1500)
+	n, err := e.Read(buf)
+	if err != nil {
+		return nil, err
+	}
+	p := &rtp.Packet{}
+	if err := p.Unmarshal(buf[:n]); err != nil {
+		return nil, err
+	}
+	return p, nil
 }
 
 func (e *Element) Close() error {

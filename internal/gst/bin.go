@@ -8,12 +8,11 @@ package gst
 import "C"
 import (
 	"fmt"
-	"runtime"
 	"unsafe"
 )
 
 type Bin struct {
-	Element
+	*Element
 }
 
 func ParseBinFromDescription(binStr string) (bin *Bin, err error) {
@@ -32,11 +31,12 @@ func ParseBinFromDescription(binStr string) (bin *Bin, err error) {
 	bin = &Bin{}
 	bin.GstElement = gstElt
 
-	runtime.SetFinalizer(bin, func(bin *Bin) {
-		C.gst_object_unref(C.gpointer(unsafe.Pointer(bin.GstElement)))
-	})
-
 	return
+}
+
+func (b *Bin) Close() error {
+	C.gst_object_unref(C.gpointer(unsafe.Pointer(b.GstElement)))
+	return nil
 }
 
 func (b *Bin) GetByName(name string) (*Element) {

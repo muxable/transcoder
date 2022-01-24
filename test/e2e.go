@@ -12,6 +12,30 @@ import (
 )
 
 func main() {
+	loop := gst.MainLoopNew()
+
+	pipeline1, err := gst.ParseLaunch("videotestsrc ! queue ! vp8enc deadline=1 ! queue ! rtpvp8pay ! udpsink host=127.0.0.1")
+	if err != nil {
+		log.Fatalf("failed to create pipeline1: %v", err)
+	}
+	pipeline1.SetState(gst.StatePlaying)
+
+	pipeline2, err := gst.ParseLaunch("udpsrc address=0.0.0.0 caps=application/x-rtp,encoding-name=VP8 ! rtpvp8depay ! queue ! decodebin ! queue ! autovideosink")
+	if err != nil {
+		log.Fatalf("failed to create pipeline2: %v", err)
+	}
+	pipeline2.SetState(gst.StatePlaying)
+
+	loop.Wait()
+
+	pipeline1.SetState(gst.StateNull)
+	pipeline2.SetState(gst.StateNull)
+
+	pipeline1.Close()
+	pipeline2.Close()
+	loop.Close()
+
+	select{}
 	for mime := range server.SupportedCodecs {
 		if mime != webrtc.MimeTypeVP8 {
 			continue
@@ -32,15 +56,15 @@ func main() {
 		// 	continue
 		// }
 
-		r, err := gst.ParseLaunch("videotestsrc ! decodebin ! x264enc !  queue ! appsink name=sink")
+		r, err := gst.ParseLaunch("videotestsrc ! queue ! vp8enc deadline=1 ! queue ! rtpvp8pay ! udpsink host=127.0.0.1")
 		if err != nil {
 			fmt.Printf("failed to create pipeline: %v", err)
-			continue
+			return
 		}
-		w, err := gst.ParseLaunch("appsrc name=source ! queue ! decodebin ! autovideosink")
+		w, err := gst.ParseLaunch("udpsrc address=0.0.0.0 caps=application/x-rtp,encoding-name=VP8 ! rtpvp8depay ! queue ! decodebin ! queue ! autovideosink")
 		if err != nil {
 			fmt.Printf("failed to create pipeline: %v", err)
-			continue
+			return
 		}
 		r.SetState(gst.StatePlaying)
 		w.SetState(gst.StatePlaying)
@@ -56,25 +80,24 @@ func main() {
 		// log.Printf("PLAYING")
 		var wg sync.WaitGroup
 		wg.Add(1)
-		go func() {
-			sink :=  r.GetByName("sink")
-			source := w.GetByName("source")
-			for {
-				s, err := sink.PullSample()
-				if err != nil {
-					fmt.Printf("failed to pull sample: %v", err)
-					if r.GetByName("sink").IsEOS() {
-						break
-					}
-				}
-				if err := source.PushSample(s); err != nil {
-					fmt.Printf("failed to push buffer: %v", err)
-					break
-				}
-			}
-			// tc.Close()
-			// wg.Done()
-		}()
+		// go func() {
+		// 	sink :=  r.GetByName("sink")
+		// 	source := w.GetByName("source")
+		// 	defer source.Close()
+		// 	for {
+		// 		s, err := sink.ReadSample()
+		// 		if err != nil {
+		// 			fmt.Printf("failed to pull sample: %v", err)
+		// 			break
+		// 		}
+		// 		if err := source.WriteSample(s); err != nil {
+		// 			fmt.Printf("failed to push buffer: %v", err)
+		// 			break
+		// 		}
+		// 	}
+		// 	// tc.Close()
+		// 	// wg.Done()
+		// }()
 		// // go func() {
 		// // 	rtpio.CopyRTP(w, tc)
 		// // 	w.Close()

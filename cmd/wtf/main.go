@@ -1,4 +1,4 @@
-package gst
+package main
 
 /*
 #cgo pkg-config: gstreamer-1.0
@@ -9,6 +9,8 @@ void run() {
   GMainLoop *loop;
 
   GstElement *pipeline1, *pipeline2;
+
+  gst_init (NULL, NULL);
 
   loop = g_main_loop_new (NULL, FALSE);
 
@@ -33,6 +35,8 @@ void run() {
 */
 import "C"
 
-func init() {
-  C.gst_init(nil, nil);
+func main() {
+  C.run()
+
+  select{}
 }

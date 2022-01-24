@@ -8,48 +8,33 @@ package gst
 import "C"
 import (
 	"errors"
-	"runtime"
 	"unsafe"
 )
 
 type Pipeline struct {
-	Bin
+	*Bin
 }
 
 func ParseLaunch(s string) (e *Pipeline, err error) {
 	cs := C.CString(s)
-	defer C.free(unsafe.Pointer(cs))
+	// defer C.free(unsafe.Pointer(cs))
 	gstElt := C.gst_parse_launch(cs, nil)
 	if gstElt == nil {
-		err = errors.New("could not create a Gstreamer pipeline")
-		return
+		return nil, errors.New("could not create a Gstreamer pipeline")
 	}
-
-	e = &Pipeline{}
-
-	e.GstElement = gstElt
-
-	runtime.SetFinalizer(e, func(e *Pipeline) {
-		C.gst_object_unref(C.gpointer(unsafe.Pointer(e.GstElement)))
-	})
-
-	return
+	return &Pipeline{Bin: &Bin{Element: &Element{GstElement: gstElt}}}, nil
 }
 
 func PipelineNew() (e *Pipeline, err error) {
 	gstElt := C.gst_pipeline_new(nil)
 	if gstElt == nil {
-		err = errors.New("could not create a Gstreamer pipeline")
-		return
+		return nil, errors.New("could not create a Gstreamer pipeline")
 	}
+	return &Pipeline{Bin: &Bin{Element: &Element{GstElement: gstElt}}}, nil
+}
 
-	e = &Pipeline{}
-
-	e.GstElement = gstElt
-
-	runtime.SetFinalizer(e, func(e *Pipeline) {
-		C.gst_object_unref(C.gpointer(unsafe.Pointer(e.GstElement)))
-	})
-
-	return
+// Close closes the child element.
+func (p *Pipeline) Close() error {
+	C.gst_object_unref(C.gpointer(unsafe.Pointer(p.GstElement)))
+	return nil
 }
