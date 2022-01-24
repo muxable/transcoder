@@ -1,138 +1,173 @@
-package test
+package main
 
 import (
 	"fmt"
-	"log"
+	"os"
 	"strings"
-	"sync"
 	"testing"
 
-	"github.com/muxable/transcoder/internal/gst"
 	"github.com/muxable/transcoder/internal/server"
 	"github.com/muxable/transcoder/pkg/transcode"
-	"github.com/pion/rtpio/pkg/rtpio"
+	"github.com/pion/rtp"
 	"github.com/pion/webrtc/v3"
+	"github.com/tinyzimmer/go-glib/glib"
+	"github.com/tinyzimmer/go-gst/gst"
+	"github.com/tinyzimmer/go-gst/gst/app"
 )
 
-func writer(s string) (*gst.Element, error) {
-	pipeline, err := gst.PipelineNew()
-	if err != nil {
-		return nil, err
+func MonitorPipeline(mainLoop *glib.MainLoop, pipeline *gst.Pipeline) func(msg *gst.Message) bool {
+	return func(msg *gst.Message) bool {
+		switch msg.Type() {
+		case gst.MessageEOS:
+			pipeline.BlockSetState(gst.StateNull)
+			mainLoop.Quit()
+		case gst.MessageError:
+			err := msg.ParseError()
+			fmt.Println("ERROR:", err.Error())
+			if debug := err.DebugString(); debug != "" {
+				fmt.Println("DEBUG:", debug)
+			}
+			mainLoop.Quit()
+		default:
+			// fmt.Println(msg)
+		}
+		return true
 	}
-	bin, err := gst.ParseBinFromDescription(s)
-	if err != nil {
-		return nil, err
-	}
-
-	pipeline.SetState(gst.StatePlaying)
-	pipeline.Add(&bin.Element)
-	bin.SetState(gst.StatePlaying)
-
-	return bin.GetByName("source"), nil
 }
 
-func reader(s string) (*gst.Element, error) {
-	pipeline, err := gst.PipelineNew()
+func input(ps string) (*gst.Pipeline, *app.Sink) {
+	r, err := gst.NewPipelineFromString(ps)
 	if err != nil {
-		return nil, err
-	}
-	bin, err := gst.ParseBinFromDescription(s)
-	if err != nil {
-		return nil, err
+		panic(err)
 	}
 
-	pipeline.SetState(gst.StatePlaying)
-	pipeline.Add(&bin.Element)
-	bin.SetState(gst.StatePlaying)
+	sink, err := r.GetElementByName("sink")
+	if err != nil {
+		panic(err)
+	}
 
-	return bin.GetByName("sink"), nil
+	return r, app.SinkFromElement(sink)
 }
 
-func TestTranscodingVideo(t *testing.T) {
+func output(ps string) (*gst.Pipeline, *app.Source, *gst.Element) {
+	w, err := gst.NewPipelineFromString(ps)
+	if err != nil {
+		panic(err)
+	}
+
+	src, err := w.GetElementByName("source")
+	if err != nil {
+		panic(err)
+	}
+
+	test, err := w.GetElementByName("test")
+	if err != nil {
+		panic(err)
+	}
+
+	return w, app.SrcFromElement(src), test
+}
+
+func TestTranscoding(t *testing.T) {
+	gst.Init(&os.Args)
+
 	for mime, codec := range server.SupportedCodecs {
-		if mime != webrtc.MimeTypeVP8 {
-			continue
-		}
-		if !strings.HasPrefix(mime, "video") {
-			continue
-		}
+		t.Run(mime, func(t *testing.T) {
 
-		log.Printf("playing %s", mime)
+			mainLoop := glib.NewMainLoop(glib.MainContextDefault(), false)
 
-		outputCodec := server.DefaultOutputCodecs[mime]
+			var ic webrtc.RTPCodecParameters
+			oc := server.DefaultOutputCodecs[mime]
 
-		tc, err := transcode.NewTranscoder(
-			server.DefaultOutputCodecs[webrtc.MimeTypeVP8],
-			transcode.ToOutputCodec(outputCodec))
-		if err != nil {
-			t.Errorf("failed to create transcoder: %v", err)
-			continue
-		}
+			var rs, ws string
+			if strings.HasPrefix(mime, "audio") {
+				ic = server.DefaultOutputCodecs[webrtc.MimeTypeOpus]
+				rs = fmt.Sprintf("audiotestsrc num-buffers=100 ! opusenc ! rtpopuspay pt=%d mtu=1200 ! appsink name=sink", server.DefaultOutputCodecs[webrtc.MimeTypeOpus].PayloadType)
+				ws = fmt.Sprintf("appsrc format=time name=source ! application/x-rtp,%s ! %s ! queue ! decodebin ! audioconvert ! testsink name=test", codec.ToCaps(oc), codec.Depayloader)
+			} else {
+				ic = server.DefaultOutputCodecs[webrtc.MimeTypeVP8]
+				rs = fmt.Sprintf("videotestsrc num-buffers=100 ! vp8enc ! rtpvp8pay pt=%d mtu=1200 ! appsink name=sink", server.DefaultOutputCodecs[webrtc.MimeTypeVP8].PayloadType)
+				ws = fmt.Sprintf("appsrc format=time name=source ! application/x-rtp,%s ! %s ! queue ! decodebin ! videoconvert ! testsink name=test", codec.ToCaps(oc), codec.Depayloader)
+			}
 
-		reader, err := reader(fmt.Sprintf("filesrc location=input.ivf ! decodebin ! vp8enc ! rtpvp8pay pt=%d mtu=1200 ! appsink name=sink", server.DefaultOutputCodecs[webrtc.MimeTypeVP8].PayloadType))
-		if err != nil {
-			t.Errorf("failed to create bin: %v", err)
-		}
-		writer, err := writer(fmt.Sprintf("appsrc format=time is-live=true name=source ! application/x-rtp,%s ! %s ! queue ! decodebin ! autovideosink", codec.ToCaps(outputCodec), codec.Depayloader))
-		if err != nil {
-			t.Errorf("failed to create bin: %v", err)
-		}
+			r, sink := input(rs)
+			w, src, test := output(ws)
 
-		var wg sync.WaitGroup
-		wg.Add(2)
-		go func() {
-			rtpio.CopyRTP(tc, reader)
-			tc.Close()
-			wg.Done()
-		}()
-		go func() {
-			rtpio.CopyRTP(writer, tc)
-			writer.Close()
-			wg.Done()
-		}()
-		wg.Wait()
+			tc, err := transcode.NewTranscoder(
+				ic,
+				transcode.ToOutputCodec(oc))
+			if err != nil {
+				t.Errorf("failed to create transcoder: %v", err)
+				return
+			}
+
+			r.GetPipelineBus().AddWatch(MonitorPipeline(mainLoop, r))
+			w.GetPipelineBus().AddWatch(MonitorPipeline(mainLoop, w))
+
+			sink.SetCallbacks(&app.SinkCallbacks{
+				NewSampleFunc: func(sink *app.Sink) gst.FlowReturn {
+					sample := sink.PullSample()
+					if sample == nil {
+						return gst.FlowEOS
+					}
+					buffer := sample.GetBuffer()
+					if buffer == nil {
+						return gst.FlowError
+					}
+					buf := buffer.Map(gst.MapRead).Bytes()
+					defer buffer.Unmap()
+
+					p := &rtp.Packet{}
+					if err := p.Unmarshal(buf); err != nil {
+						t.Errorf("failed to unmarshal packet: %v", err)
+						return gst.FlowError
+					}
+					if err := tc.WriteRTP(p); err != nil {
+						t.Errorf("failed to write packet: %v", err)
+						return gst.FlowError
+					}
+					return gst.FlowOK
+				},
+			})
+
+			src.SetCallbacks(&app.SourceCallbacks{
+				NeedDataFunc: func(src *app.Source, length uint) {
+					p, err := tc.ReadRTP()
+					if err != nil {
+						t.Errorf("failed to read packet: %v", err)
+						return
+					}
+					buf, err := p.Marshal()
+					if err != nil {
+						t.Errorf("failed to marshal packet: %v", err)
+						return
+					}
+
+					buffer := gst.NewBufferWithSize(int64(len(buf)))
+
+					buffer.Map(gst.MapWrite).WriteData(buf)
+					buffer.Unmap()
+
+					src.PushBuffer(buffer)
+				},
+			})
+
+			r.SetState(gst.StatePlaying)
+			w.SetState(gst.StatePlaying)
+			defer r.SetState(gst.StateNull)
+			defer w.SetState(gst.StateNull)
+
+			mainLoop.Run()
+
+			bc, err := test.GetProperty("buffer-count")
+			if err != nil {
+				t.Errorf("failed to get buffer count: %v", err)
+				return
+			}
+			if bc.(int64) == 0 {
+				t.Errorf("buffer count is %d, expected >0", bc.(int64))
+				return
+			}
+		})
 	}
 }
-
-// func TestTranscodingAudio(t *testing.T) {
-// 	for mime, codec := range server.SupportedCodecs {
-// 		if !strings.HasPrefix(mime, "audio") {
-// 			continue
-// 		}
-
-// 		log.Printf("playing %s", mime)
-
-// 		outputCodec := server.DefaultOutputCodecs[mime]
-
-// 		tc, err := transcode.NewTranscoder(
-// 			server.DefaultOutputCodecs[webrtc.MimeTypeOpus],
-// 			transcode.ToOutputCodec(outputCodec))
-// 		if err != nil {
-// 			t.Errorf("failed to create transcoder: %v", err)
-// 			continue
-// 		}
-
-// 		reader, err := reader(fmt.Sprintf("filesrc location=input.ogg ! oggdemux ! rtpopuspay pt=%d mtu=1200 ! appsink name=sink", server.DefaultOutputCodecs[webrtc.MimeTypeOpus].PayloadType))
-// 		if err != nil {
-// 			t.Errorf("failed to create bin: %v", err)
-// 		}
-// 		writer, err := writer(fmt.Sprintf("appsrc format=time is-live=true name=source ! application/x-rtp,%s ! %s ! queue ! decodebin ! audioconvert ! pulsesink provide-clock=false", codec.ToCaps(outputCodec), codec.Depayloader))
-// 		if err != nil {
-// 			t.Errorf("failed to create bin: %v", err)
-// 		}
-
-// 		var wg sync.WaitGroup
-// 		wg.Add(2)
-// 		go func() {
-// 			rtpio.CopyRTP(tc, reader)
-// 			tc.Close()
-// 			wg.Done()
-// 		}()
-// 		go func() {
-// 			rtpio.CopyRTP(writer, tc)
-// 			writer.Close()
-// 			wg.Done()
-// 		}()
-// 		wg.Wait()
-// 	}
-// }

@@ -66,23 +66,43 @@ var DefaultOutputCodecs = map[string]webrtc.RTPCodecParameters{
 	},
 
 	webrtc.MimeTypeVP8: {
-		RTPCodecCapability: webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeVP8, ClockRate: 90000},
+		RTPCodecCapability: webrtc.RTPCodecCapability{
+			MimeType: webrtc.MimeTypeVP8,
+			ClockRate: 90000,
+			RTCPFeedback: []webrtc.RTCPFeedback{{Type: "goog-remb", Parameter: ""}, {Type: "ccm", Parameter: "fir"}, {Type: "nack", Parameter: ""}, {Type: "nack", Parameter: "pli"}},
+		},
 		PayloadType: 100,
 	},
 	webrtc.MimeTypeVP9: {
-		RTPCodecCapability: webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeVP9, ClockRate: 90000},
+		RTPCodecCapability: webrtc.RTPCodecCapability{
+			MimeType: webrtc.MimeTypeVP9,
+			ClockRate: 90000,
+			RTCPFeedback: []webrtc.RTCPFeedback{{Type: "goog-remb", Parameter: ""}, {Type: "ccm", Parameter: "fir"}, {Type: "nack", Parameter: ""}, {Type: "nack", Parameter: "pli"}},
+		},
 		PayloadType: 101,
 	},
 	webrtc.MimeTypeH264: {
-		RTPCodecCapability: webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeH264, ClockRate: 90000},
+		RTPCodecCapability: webrtc.RTPCodecCapability{
+			MimeType: webrtc.MimeTypeH264,
+			ClockRate: 90000,
+			RTCPFeedback: []webrtc.RTCPFeedback{{Type: "goog-remb", Parameter: ""}, {Type: "ccm", Parameter: "fir"}, {Type: "nack", Parameter: ""}, {Type: "nack", Parameter: "pli"}},
+		},
 		PayloadType: 102,
 	},
 	webrtc.MimeTypeH265: {
-		RTPCodecCapability: webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeH265, ClockRate: 90000},
+		RTPCodecCapability: webrtc.RTPCodecCapability{
+			MimeType: webrtc.MimeTypeH265,
+			ClockRate: 90000,
+			RTCPFeedback: []webrtc.RTCPFeedback{{Type: "goog-remb", Parameter: ""}, {Type: "ccm", Parameter: "fir"}, {Type: "nack", Parameter: ""}, {Type: "nack", Parameter: "pli"}},
+		},
 		PayloadType: 103,
 	},
 	webrtc.MimeTypeAV1: {
-		RTPCodecCapability: webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeAV1, ClockRate: 90000},
+		RTPCodecCapability: webrtc.RTPCodecCapability{
+			MimeType: webrtc.MimeTypeAV1,
+			ClockRate: 90000,
+			RTCPFeedback: []webrtc.RTCPFeedback{{Type: "goog-remb", Parameter: ""}, {Type: "ccm", Parameter: "fir"}, {Type: "nack", Parameter: ""}, {Type: "nack", Parameter: "pli"}},
+		},
 		PayloadType: 104,
 	},
 
@@ -208,13 +228,13 @@ func PipelineString(from, to webrtc.RTPCodecParameters, encoder string) (string,
 		inputCaps := fmt.Sprintf("application/x-rtp,media=(string)video,%s", fromParameters.ToCaps(from))
 
 		return fmt.Sprintf(
-			"appsrc format=time is-live=true name=source ! %s ! %s ! queue ! decodebin ! autovideosink",
-			inputCaps, fromParameters.Depayloader), nil
+			"appsrc is-live=true do-timestamp=true format=time name=source ! %s ! %s ! queue ! decodebin ! queue ! videoconvert ! videorate ! %s ! %s ! queue ! appsink name=sink sync=false async=false",
+			inputCaps, fromParameters.Depayloader, encoder, toParameters.Payloader), nil
 	} else if strings.HasPrefix(from.MimeType, "audio") {
 		inputCaps := fmt.Sprintf("application/x-rtp,media=(string)audio,%s", fromParameters.ToCaps(from))
 
 		return fmt.Sprintf(
-			"appsrc format=time is-live=true name=source ! %s ! %s ! queue ! decodebin ! queue ! audioconvert ! audioresample ! %s ! %s mtu=1200 ! appsink name=sink sync=false async=false",
+			"appsrc is-live=true do-timestamp=true format=time name=source ! %s ! %s ! queue ! decodebin ! queue ! audioconvert ! audioresample ! %s ! %s mtu=1200 ! appsink name=sink sync=false async=false",
 			inputCaps, fromParameters.Depayloader, encoder, toParameters.Payloader), nil
 	}
 	return "", fmt.Errorf("unsupported codec %s", from.MimeType)

@@ -1,9 +1,7 @@
 package transcode
 
 import (
-	"fmt"
-
-	"github.com/muxable/transcoder/internal/gst"
+	"github.com/tinyzimmer/go-gst/gst"
 )
 
 type Synchronizer struct {
@@ -11,7 +9,7 @@ type Synchronizer struct {
 }
 
 func NewSynchronizer() (*Synchronizer, error) {
-	pipeline, err := gst.PipelineNew()
+	pipeline, err := gst.NewPipeline("")
 	if err != nil {
 		return nil, err
 	}
@@ -24,8 +22,5 @@ func NewSynchronizer() (*Synchronizer, error) {
 }
 
 func (s *Synchronizer) Close() error {
-	if r := s.element.SetState(gst.StateNull); r != gst.StateChangeSuccess {
-		return fmt.Errorf("failed to set state to null: %+v", r)
-	}
-	return nil
+	return s.element.SetState(gst.StateNull)
 }

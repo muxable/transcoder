@@ -18,7 +18,6 @@ func NewTranscoderPeerConnection(configuration webrtc.Configuration) (*webrtc.Pe
 		RTPCodecCapability: webrtc.RTPCodecCapability{
 			MimeType:     "video/H265",
 			ClockRate:    90000,
-			Channels:     0,
 			SDPFmtpLine:  "",
 			RTCPFeedback: []webrtc.RTCPFeedback{{Type: "goog-remb", Parameter: ""}, {Type: "ccm", Parameter: "fir"}, {Type: "nack", Parameter: ""}, {Type: "nack", Parameter: "pli"}},
 		},
