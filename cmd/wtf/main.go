@@ -4,53 +4,82 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/muxable/transcoder/internal/gst"
 	"github.com/tinyzimmer/go-glib/glib"
+	"github.com/tinyzimmer/go-gst/gst"
+	"github.com/tinyzimmer/go-gst/gst/app"
 )
 
+func MonitorPipeline(mainLoop *glib.MainLoop, pipeline *gst.Pipeline) func(msg *gst.Message) bool {
+	return func(msg *gst.Message) bool {
+		switch msg.Type() {
+		case gst.MessageEOS:
+			pipeline.BlockSetState(gst.StateNull)
+			mainLoop.Quit()
+		case gst.MessageError:
+			err := msg.ParseError()
+			fmt.Println("ERROR:", err.Error())
+			if debug := err.DebugString(); debug != "" {
+				fmt.Println("DEBUG:", debug)
+			}
+			mainLoop.Quit()
+		default:
+			fmt.Println(msg)
+		}
+		return true
+	}
+}
+
+func input() (*gst.Pipeline, *app.Sink) {
+	r, err := gst.NewPipelineFromString("videotestsrc ! vp8enc ! rtpvp8pay ! appsink name=sink")
+	if err != nil {
+		panic(err)
+	}
+
+	sink, err := r.GetElementByName("sink")
+	if err != nil {
+		panic(err)
+	}
+
+	return r, app.SinkFromElement(sink)
+}
+
+func output() (*gst.Pipeline, *app.Source) {
+	w, err := gst.NewPipelineFromString("appsrc name=source format=time ! rtpvp8depay ! vp8dec ! autovideosink")
+	if err != nil {
+		panic(err)
+	}
+
+	src, err := w.GetElementByName("source")
+	if err != nil {
+		panic(err)
+	}
+
+	return w, app.SrcFromElement(src)
+}
+
 func main() {
-    // Initialize GStreamer with the arguments passed to the program. Gstreamer
-    // and the bindings will automatically pop off any handled arguments leaving
-    // nothing but a pipeline string (unless other invalid args are present).
-    gst.Init(&os.Args)
+	gst.Init(&os.Args)
 
-    // Create a main loop. This is only required when utilizing signals via the bindings.
-    // In this example, the AddWatch on the pipeline bus requires iterating on the main loop.
-    mainLoop := glib.NewMainLoop(glib.MainContextDefault(), false)
+	mainLoop := glib.NewMainLoop(glib.MainContextDefault(), false)
 
-    pipelineString := "videotestsrc is-live=true ! queue ! decodebin ! queue ! videoconvert ! autovideosink"
+	r, sink := input()
+	w, src := output()
 
-    /// Let GStreamer create a pipeline from the parsed launch syntax on the cli.
-    pipeline, err := gst.NewPipelineFromString(pipelineString)
-    if err != nil {
-        fmt.Println(err)
-        os.Exit(2)
-    }
+	r.GetPipelineBus().AddWatch(MonitorPipeline(mainLoop, r))
+	w.GetPipelineBus().AddWatch(MonitorPipeline(mainLoop, w))
 
-    // Add a message handler to the pipeline bus, printing interesting information to the console.
-    pipeline.GetPipelineBus().AddWatch(func(msg *gst.Message) bool {
-        switch msg.Type() {
-        case gst.MessageEOS: // When end-of-stream is received flush the pipeling and stop the main loop
-            pipeline.BlockSetState(gst.StateNull)
-            mainLoop.Quit()
-        case gst.MessageError: // Error messages are always fatal
-            err := msg.ParseError()
-            fmt.Println("ERROR:", err.Error())
-            if debug := err.DebugString(); debug != "" {
-                fmt.Println("DEBUG:", debug)
-            }
-            mainLoop.Quit()
-        default:
-            // All messages implement a Stringer. However, this is
-            // typically an expensive thing to do and should be avoided.
-            fmt.Println(msg)
-        }
-        return true
-    })
+	sink.SetCallbacks(&app.SinkCallbacks{
+		NewSampleFunc: func(sink *app.Sink) gst.FlowReturn {
+			sample := sink.PullSample()
+			if sample == nil {
+				return gst.FlowEOS
+			}
+			return src.PushSample(sample)
+		},
+	})
 
-    // Start the pipeline
-    pipeline.SetState(gst.StatePlaying)
+	r.SetState(gst.StatePlaying)
+	w.SetState(gst.StatePlaying)
 
-    // Block and iterate on the main loop
-    mainLoop.Run()
+	mainLoop.Run()
 }

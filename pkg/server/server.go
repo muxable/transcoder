@@ -7,6 +7,7 @@ import (
 
 	"github.com/muxable/transcoder/api"
 	"github.com/muxable/transcoder/internal/peerconnection"
+	"github.com/muxable/transcoder/internal/server"
 	"github.com/muxable/transcoder/pkg/transcode"
 	"github.com/pion/rtpio/pkg/rtpio"
 	"github.com/pion/webrtc/v3"
@@ -187,13 +188,13 @@ func (s *TranscoderServer) Transcode(ctx context.Context, request *api.Transcode
 	// tr is the remote track that matches the request.
 	transcoder, err := transcode.NewTranscoder(matched.TrackRemote.Codec(),
 		transcode.WithSynchronizer(matched.Synchronizer),
-		transcode.ToMimeType(request.MimeType),
+		transcode.ToOutputCodec(server.DefaultOutputCodecs[request.MimeType]),
 		transcode.ViaGStreamerEncoder(request.GstreamerPipeline))
 	if err != nil {
 		return nil, err
 	}
 
-	tl, err := webrtc.NewTrackLocalStaticRTP(transcoder.OutputCodec(), matched.TrackRemote.ID(), matched.TrackRemote.StreamID())
+	tl, err := webrtc.NewTrackLocalStaticRTP(transcoder.OutputCodec().RTPCodecCapability, matched.TrackRemote.ID(), matched.TrackRemote.StreamID())
 	if err != nil {
 		return nil, err
 	}

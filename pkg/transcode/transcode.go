@@ -1,21 +1,21 @@
 package transcode
 
 import (
+	"errors"
 	"fmt"
 	"io"
-	"log"
 	"strings"
 
-	"github.com/muxable/transcoder/internal/gst"
 	"github.com/muxable/transcoder/internal/server"
 	"github.com/pion/rtp"
-	"github.com/pion/rtpio/pkg/rtpio"
 	"github.com/pion/webrtc/v3"
+	"github.com/tinyzimmer/go-gst/gst"
+	"github.com/tinyzimmer/go-gst/gst/app"
 )
 
 type Transcoder struct {
-	sink rtpio.RTPWriteCloser
-	source rtpio.RTPReader
+	sink   *app.Source
+	source *app.Sink
 
 	synchronizer     *Synchronizer
 	encodingPipeline string
@@ -49,32 +49,32 @@ func NewTranscoder(from webrtc.RTPCodecParameters, options ...TranscoderOption) 
 		return nil, err
 	}
 
-	log.Printf("%v", transcodingPipelineStr)
-
-	bin, err := gst.ParseBinFromDescription(transcodingPipelineStr)
+	bin, err := gst.NewBinFromString(transcodingPipelineStr, false)
 	if err != nil {
 		return nil, err
 	}
 
-	source := bin.GetByName("source")
-	sink := bin.GetByName("sink")
-	if source != nil {
-		t.sink = source
+	src, err := bin.GetElementByName("source")
+	if err != nil {
+		return nil, err
 	}
-	if sink != nil {
-		t.source = sink
+	sink, err := bin.GetElementByName("sink")
+	if err != nil {
+		return nil, err
 	}
+	t.sink = app.SrcFromElement(src)
+	t.source = app.SinkFromElement(sink)
 	if t.synchronizer == nil {
-		pipeline, err := gst.NewPipeline()
+		pipeline, err := gst.NewPipeline("")
 		if err != nil {
 			return nil, err
 		}
-		pipeline.Add(&bin.Element)
+		pipeline.Add(bin.Element)
 		pipeline.SetState(gst.StatePlaying)
 
-		t.bin = &pipeline.Bin
+		t.bin = pipeline.Bin
 	} else {
-		t.synchronizer.element.Add(&bin.Element)
+		t.synchronizer.element.Add(bin.Element)
 		t.bin = bin
 	}
 
@@ -88,11 +88,18 @@ func (t *Transcoder) OutputCodec() webrtc.RTPCodecParameters {
 }
 
 func (t *Transcoder) ReadRTP() (*rtp.Packet, error) {
-	if t.source == nil {
+	sample := t.source.PullSample()
+	if sample == nil {
 		return nil, io.EOF
 	}
-	p, err := t.source.ReadRTP()
-	if err != nil {
+	buffer := sample.GetBuffer()
+	if buffer == nil {
+		return nil, fmt.Errorf("no buffer in sample")
+	}
+	buf := buffer.Map(gst.MapRead).Bytes()
+	defer buffer.Unmap()
+	p := &rtp.Packet{}
+	if err := p.Unmarshal(buf); err != nil {
 		return nil, err
 	}
 	return p, nil
@@ -103,23 +110,35 @@ func (t *Transcoder) WriteRTP(p *rtp.Packet) error {
 	if t.sink == nil {
 		return nil
 	}
-	return t.sink.WriteRTP(p)
+	buf, err := p.Marshal()
+	if err != nil {
+		return err
+	}
+
+	buffer := gst.NewBufferWithSize(int64(len(buf)))
+
+	buffer.Map(gst.MapWrite).WriteData(buf)
+	buffer.Unmap()
+
+	if r := t.sink.PushBuffer(buffer); r != gst.FlowOK {
+		return fmt.Errorf("failed to push buffer: %v", r)
+	}
+	return nil
 }
 
 func (t *Transcoder) Close() error {
 	t.bin.SetState(gst.StateNull)
 
 	if t.synchronizer != nil {
-		t.synchronizer.element.Remove(&t.bin.Element)
+		t.synchronizer.element.Remove(t.bin.Element)
 	}
 
-	if t.sink == nil {
-		return nil
+	if err := t.sink.EndStream(); err != gst.FlowEOS {
+		return errors.New("failed to end stream")
 	}
 
-	if err := t.sink.Close(); err != nil {
-		return err
-	}
+	t.source.Unref()
+	t.sink.Unref()
 
 	return nil
 }
