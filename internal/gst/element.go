@@ -38,8 +38,13 @@ func FactoryElementMake(s string) (*Element, error) {
 	return &Element{GstElement: CGstElement}, nil
 }
 
-func (e *Element) Link(f *Element) {
-	C.gst_element_link(e.GstElement, f.GstElement)
+func Link(elements ...*Element) error {
+	for i := 0; i < len(elements)-1; i++ {
+		if C.gst_element_link(elements[i].GstElement, elements[i+1].GstElement) != C.int(1) {
+			return errors.New("could not link elements")
+		}
+	}
+	return nil
 }
 
 func (e *Element) SetState(state StateOptions) StateChangeReturn {

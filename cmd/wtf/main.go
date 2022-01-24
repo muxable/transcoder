@@ -11,6 +11,14 @@ func main() {
   if err != nil {
     panic(err)
   }
+  encoder, err := gst.FactoryElementMake("vp8enc")
+  if err != nil {
+    panic(err)
+  }
+  decoder, err := gst.FactoryElementMake("vp8dec")
+  if err != nil {
+    panic(err)
+  }
   sink, err := gst.FactoryElementMake("autovideosink")
   if err != nil {
     panic(err)
@@ -20,9 +28,9 @@ func main() {
     panic(err)
   }
 
-  pipeline.Add(source, sink)
+  pipeline.Add(source, encoder, decoder, sink)
 
-  source.Link(sink)
+  gst.Link(source, encoder, decoder, sink)
 
   pipeline.SetState(gst.StatePlaying)
 
