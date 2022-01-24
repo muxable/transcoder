@@ -14,7 +14,7 @@ import (
 func main() {
 	loop := gst.MainLoopNew()
 
-	pipeline1, err := gst.ParseLaunch("videotestsrc ! queue ! vp8enc deadline=1 ! queue ! rtpvp8pay ! udpsink host=127.0.0.1")
+	pipeline1, err := gst.ParseLaunch("videotestsrc ! autovideosink")
 	if err != nil {
 		log.Fatalf("failed to create pipeline1: %v", err)
 	}

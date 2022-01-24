@@ -39,6 +39,12 @@ func (b *Bin) Close() error {
 	return nil
 }
 
+func (b *Bin) Add(elem ...*Element) {
+	for _, e := range elem {
+		C.gst_bin_add((*C.GstBin)(unsafe.Pointer(b.GstElement)), e.GstElement)
+	}
+}
+
 func (b *Bin) GetByName(name string) (*Element) {
 	n := (*C.gchar)(unsafe.Pointer(C.CString(name)))
 	defer C.g_free(C.gpointer(unsafe.Pointer(n)))
@@ -50,10 +56,6 @@ func (b *Bin) GetByName(name string) (*Element) {
 	return &Element{
 		GstElement: CElement,
 	}
-}
-
-func (b *Bin) Add(child *Element) {
-	C.gst_bin_add((*C.GstBin)(unsafe.Pointer(b.GstElement)), child.GstElement)
 }
 
 func (b *Bin) Remove(child *Element) {

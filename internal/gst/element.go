@@ -28,6 +28,20 @@ type Element struct {
 	GstElement *C.GstElement
 }
 
+func FactoryElementMake(s string) (*Element, error) {
+	cs := C.CString(s)
+	defer C.free(unsafe.Pointer(cs))
+	CGstElement := C.gst_element_factory_make(cs, nil)
+	if CGstElement == nil {
+		return nil, errors.New("could not create element")
+	}
+	return &Element{GstElement: CGstElement}, nil
+}
+
+func (e *Element) Link(f *Element) {
+	C.gst_element_link(e.GstElement, f.GstElement)
+}
+
 func (e *Element) SetState(state StateOptions) StateChangeReturn {
 	Cint := C.gst_element_set_state(e.GstElement, C.GstState(state))
 	return StateChangeReturn(Cint)

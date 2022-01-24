@@ -17,7 +17,7 @@ type Pipeline struct {
 
 func ParseLaunch(s string) (e *Pipeline, err error) {
 	cs := C.CString(s)
-	// defer C.free(unsafe.Pointer(cs))
+	defer C.free(unsafe.Pointer(cs))
 	gstElt := C.gst_parse_launch(cs, nil)
 	if gstElt == nil {
 		return nil, errors.New("could not create a Gstreamer pipeline")
