@@ -17,6 +17,9 @@ RUN go build -v -o /transcoder cmd/main.go
 ENV APP_ENV=production
 ENV GST_DEBUG=3
 
+EXPOSE 5000-5200/udp
+EXPOSE 50051/tcp
+
 RUN go test ./...
 
 CMD [ "/transcoder" ]
