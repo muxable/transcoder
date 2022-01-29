@@ -185,11 +185,16 @@ func (s *TranscoderServer) Transcode(ctx context.Context, request *api.Transcode
 		s.onTrack.L.Unlock()
 	}
 
+	options := []transcode.TranscoderOption{transcode.WithSynchronizer(matched.Synchronizer)}
+	if request.MimeType != "" {
+		options = append(options, transcode.ToOutputCodec(server.DefaultOutputCodecs[request.MimeType]))
+	}
+	if request.GstreamerPipeline != "" {
+		options = append(options, transcode.ViaGStreamerEncoder(request.GstreamerPipeline))
+	}
+
 	// tr is the remote track that matches the request.
-	transcoder, err := transcode.NewTranscoder(matched.TrackRemote.Codec(),
-		transcode.WithSynchronizer(matched.Synchronizer),
-		transcode.ToOutputCodec(server.DefaultOutputCodecs[request.MimeType]),
-		transcode.ViaGStreamerEncoder(request.GstreamerPipeline))
+	transcoder, err := transcode.NewTranscoder(matched.TrackRemote.Codec(), options...)
 	if err != nil {
 		return nil, err
 	}
