@@ -150,7 +150,7 @@ var SupportedCodecs = map[string]GStreamerParameters{
 		},
 	},
 	webrtc.MimeTypeVP8: {
-		"rtpvp8depay", "vp8enc", "rtpvp8pay",
+		"rtpvp8depay", "vp8enc deadline=1", "rtpvp8pay",
 		func(c webrtc.RTPCodecParameters) string {
 			return fmt.Sprintf("encoding-name=VP8,clock-rate=%d,payload=%d", c.ClockRate, c.PayloadType)
 		},
@@ -229,14 +229,15 @@ func PipelineString(from, to webrtc.RTPCodecParameters, encoder string) (string,
 		inputCaps := fmt.Sprintf("application/x-rtp,media=(string)video,%s", fromParameters.ToCaps(from))
 
 		return fmt.Sprintf(
-			"appsrc is-live=true do-timestamp=true format=time name=source ! %s ! %s ! queue ! decodebin ! queue ! videoconvert ! videorate ! %s ! %s ! queue ! appsink name=sink sync=false async=false",
+			"appsrc is-live=true format=time name=source ! %s ! %s ! queue ! decodebin ! queue ! videoconvert ! videorate ! %s ! %s ! queue ! appsink name=sink sync=false async=false",
 			inputCaps, fromParameters.Depayloader, encoder, toParameters.Payloader), nil
 	} else if strings.HasPrefix(from.MimeType, "audio") {
 		inputCaps := fmt.Sprintf("application/x-rtp,media=(string)audio,%s", fromParameters.ToCaps(from))
 
 		return fmt.Sprintf(
-			"appsrc is-live=true do-timestamp=true format=time name=source ! %s ! %s ! queue ! decodebin ! queue ! audioconvert ! audioresample ! %s ! %s mtu=1200 ! appsink name=sink sync=false async=false",
+			"appsrc is-live=true format=time name=source ! %s ! %s ! queue ! decodebin ! queue ! audioconvert ! audioresample ! %s ! %s mtu=1200 ! appsink name=sink sync=false async=false",
 			inputCaps, fromParameters.Depayloader, encoder, toParameters.Payloader), nil
 	}
 	return "", fmt.Errorf("unsupported codec %s", from.MimeType)
+
 }

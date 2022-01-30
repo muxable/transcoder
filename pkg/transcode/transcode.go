@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
 	"github.com/muxable/transcoder/internal/server"
 	"github.com/pion/rtp"
@@ -22,11 +23,16 @@ type Transcoder struct {
 
 	bin *gst.Bin
 
+	inputCodec  *webrtc.RTPCodecParameters
 	outputCodec *webrtc.RTPCodecParameters
+
+	t0                uint32
+	previousTimestamp uint32
+	rollovers         uint32
 }
 
 func NewTranscoder(from webrtc.RTPCodecParameters, options ...TranscoderOption) (*Transcoder, error) {
-	t := &Transcoder{}
+	t := &Transcoder{inputCodec: &from}
 
 	for _, option := range options {
 		option(t)
@@ -34,7 +40,7 @@ func NewTranscoder(from webrtc.RTPCodecParameters, options ...TranscoderOption) 
 
 	if t.outputCodec == nil {
 		if strings.HasPrefix(from.MimeType, "video") {
-			codec := server.DefaultOutputCodecs[webrtc.MimeTypeH264]
+			codec := server.DefaultOutputCodecs[webrtc.MimeTypeVP8]
 			t.outputCodec = &codec
 		} else if strings.HasPrefix(from.MimeType, "audio") {
 			codec := server.DefaultOutputCodecs[webrtc.MimeTypeOpus]
@@ -119,6 +125,17 @@ func (t *Transcoder) WriteRTP(p *rtp.Packet) error {
 
 	buffer.Map(gst.MapWrite).WriteData(buf)
 	buffer.Unmap()
+
+	if t.t0 == 0 {
+		t.t0 = p.Timestamp
+	}
+	if t.previousTimestamp > 1<<31 && p.Timestamp < 1<<31 {
+		t.rollovers++
+	}
+	t.previousTimestamp = p.Timestamp
+	trueTs := int64(p.Timestamp) - int64(t.t0) + int64(t.rollovers) * (1<<32)
+	pts := (time.Duration(trueTs) * time.Second) / time.Duration(t.inputCodec.ClockRate)
+	buffer.SetPresentationTimestamp(pts)
 
 	if r := t.sink.PushBuffer(buffer); r != gst.FlowOK {
 		return fmt.Errorf("failed to push buffer: %v", r)
