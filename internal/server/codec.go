@@ -138,25 +138,25 @@ type CodecMapping struct {
 
 var SupportedCodecs = map[string]GStreamerParameters{
 	webrtc.MimeTypeH264: {
-		"rtph264depay", "video/x-raw,format=I420 ! x264enc speed-preset=ultrafast tune=zerolatency key-int-max=20", "rtph264pay",
+		"rtph264depay", "video/x-raw,format=I420 ! x264enc pass=qual tune=zerolatency key-int-max=20", "rtph264pay config-interval=1",
 		func(c webrtc.RTPCodecParameters) string {
-			return fmt.Sprintf("encoding-name=H264,clock-rate=%d,payload=%d,packetization-mode=(string)1,profile-level-id=(string)42c028", c.ClockRate, c.PayloadType)
+			return fmt.Sprintf("encoding-name=H264,clock-rate=%d,payload=%d,packetization-mode=(string)1,profile-level-id=(string)42001f", c.ClockRate, c.PayloadType)
 		},
 	},
 	webrtc.MimeTypeH265: {
-		"rtph265depay", "video/x-raw,format=I420 ! x265enc speed-preset=ultrafast tune=zerolatency key-int-max=20", "rtph265pay",
+		"rtph265depay", "video/x-raw,format=I420 ! x265enc pass=qual speed-preset=ultrafast tune=zerolatency key-int-max=20", "rtph265pay",
 		func(c webrtc.RTPCodecParameters) string {
 			return fmt.Sprintf("encoding-name=H265,clock-rate=%d,payload=%d", c.ClockRate, c.PayloadType)
 		},
 	},
 	webrtc.MimeTypeVP8: {
-		"rtpvp8depay", "vp8enc deadline=1", "rtpvp8pay",
+		"rtpvp8depay", "vp8enc end-usage=cq error-resilient=partitions keyframe-max-dist=10 auto-alt-ref=true cpu-used=5", "rtpvp8pay",
 		func(c webrtc.RTPCodecParameters) string {
 			return fmt.Sprintf("encoding-name=VP8,clock-rate=%d,payload=%d", c.ClockRate, c.PayloadType)
 		},
 	},
 	webrtc.MimeTypeVP9: {
-		"rtpvp9depay", "vp9enc deadline=1", "rtpvp9pay",
+		"rtpvp9depay", "vp9enc end-usage=cq error-resilient=partitions keyframe-max-dist=10 auto-alt-ref=true cpu-used=5", "rtpvp9pay",
 		func(c webrtc.RTPCodecParameters) string {
 			return fmt.Sprintf("encoding-name=VP9,clock-rate=%d,payload=%d", c.ClockRate, c.PayloadType)
 		},
