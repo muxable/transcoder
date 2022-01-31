@@ -138,13 +138,13 @@ type CodecMapping struct {
 
 var SupportedCodecs = map[string]GStreamerParameters{
 	webrtc.MimeTypeH264: {
-		"rtph264depay", "video/x-raw,format=I420 ! x264enc pass=qual tune=zerolatency key-int-max=20", "rtph264pay config-interval=1",
+		"rtph264depay", "x264enc speed-preset=veryfast tune=zerolatency key-int-max=20", "rtph264pay config-interval=1",
 		func(c webrtc.RTPCodecParameters) string {
 			return fmt.Sprintf("encoding-name=H264,clock-rate=%d,payload=%d,packetization-mode=(string)1,profile-level-id=(string)42001f", c.ClockRate, c.PayloadType)
 		},
 	},
 	webrtc.MimeTypeH265: {
-		"rtph265depay", "video/x-raw,format=I420 ! x265enc pass=qual speed-preset=ultrafast tune=zerolatency key-int-max=20", "rtph265pay",
+		"rtph265depay", "x265enc speed-preset=ultrafast tune=zerolatency key-int-max=20", "rtph265pay",
 		func(c webrtc.RTPCodecParameters) string {
 			return fmt.Sprintf("encoding-name=H265,clock-rate=%d,payload=%d", c.ClockRate, c.PayloadType)
 		},
@@ -229,13 +229,13 @@ func PipelineString(from, to webrtc.RTPCodecParameters, encoder string) (string,
 		inputCaps := fmt.Sprintf("application/x-rtp,media=(string)video,%s", fromParameters.ToCaps(from))
 
 		return fmt.Sprintf(
-			"appsrc is-live=true format=time name=source ! %s ! rtpjitterbuffer ! %s ! queue ! decodebin ! queue ! videoconvert ! videorate ! %s ! %s ! queue ! appsink name=sink sync=false async=false",
-			inputCaps, fromParameters.Depayloader, encoder, toParameters.Payloader), nil
+			"%s ! decodebin ! queue ! videoconvert ! videorate ! %s ! %s",
+			inputCaps, encoder, toParameters.Payloader), nil
 	} else if strings.HasPrefix(from.MimeType, "audio") {
 		inputCaps := fmt.Sprintf("application/x-rtp,media=(string)audio,%s", fromParameters.ToCaps(from))
 
 		return fmt.Sprintf(
-			"appsrc is-live=true format=time name=source ! %s ! rtpjitterbuffer ! %s ! queue ! decodebin ! queue ! audioconvert ! audioresample ! %s ! %s mtu=1200 ! appsink name=sink sync=false async=false",
+			"%s ! %s ! queue ! decodebin ! queue ! audioconvert ! audioresample ! %s ! %s mtu=1200",
 			inputCaps, fromParameters.Depayloader, encoder, toParameters.Payloader), nil
 	}
 	return "", fmt.Errorf("unsupported codec %s", from.MimeType)

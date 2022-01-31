@@ -4,17 +4,17 @@ go 1.17
 
 require (
 	github.com/blendle/zapdriver v1.3.1
+	github.com/mattn/go-pointer v0.0.1
 	github.com/pion/rtpio v0.1.4
-	github.com/tinyzimmer/go-glib v0.0.24
-	github.com/tinyzimmer/go-gst v0.2.32
+	go.uber.org/goleak v1.1.12
 	google.golang.org/grpc v1.43.0
 	google.golang.org/protobuf v1.27.1
 )
 
 require (
+	github.com/benbjohnson/clock v1.1.0 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/go-cmp v0.5.7 // indirect
-	github.com/mattn/go-pointer v0.0.1 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.7.0 // indirect

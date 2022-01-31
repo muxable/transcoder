@@ -9,7 +9,6 @@ import (
 	"github.com/muxable/transcoder/api"
 	"github.com/muxable/transcoder/pkg/server"
 	"github.com/pion/webrtc/v3"
-	"github.com/tinyzimmer/go-gst/gst"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health"
@@ -35,8 +34,6 @@ func main() {
 	defer logger.Sync()
 	undo := zap.ReplaceGlobals(logger)
 	defer undo()
-
-	gst.Init(nil)
 
 	port := os.Getenv("PORT")
 	if port == "" {

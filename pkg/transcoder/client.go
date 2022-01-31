@@ -2,7 +2,6 @@ package transcoder
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"sync"
 
@@ -32,9 +31,11 @@ func NewClient(ctx context.Context, conn *grpc.ClientConn) (*Client, error) {
 		return nil, err
 	}
 
+	signaller := peerconnection.Negotiate(peerConnection)
+
 	client := api.NewTranscoderClient(conn)
 
-	signal, err := client.Signal(ctx)
+	signalClient, err := client.Signal(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -45,44 +46,6 @@ func NewClient(ctx context.Context, conn *grpc.ClientConn) (*Client, error) {
 		grpcClient:     client,
 		promises:       make(map[string]chan *webrtc.TrackRemote),
 	}
-
-	peerConnection.OnNegotiationNeeded(func() {
-		offer, err := peerConnection.CreateOffer(nil)
-		if err != nil {
-			zap.L().Error("failed to create offer", zap.Error(err))
-			return
-		}
-
-		if err := peerConnection.SetLocalDescription(offer); err != nil {
-			zap.L().Error("failed to set local description", zap.Error(err))
-			return
-		}
-
-		if err := signal.Send(&api.SignalMessage{
-			Payload: &api.SignalMessage_OfferSdp{OfferSdp: offer.SDP},
-		}); err != nil {
-			zap.L().Error("failed to send offer", zap.Error(err))
-			return
-		}
-	})
-
-	peerConnection.OnICECandidate(func(candidate *webrtc.ICECandidate) {
-		if candidate == nil {
-			return
-		}
-
-		trickle, err := json.Marshal(candidate.ToJSON())
-		if err != nil {
-			zap.L().Error("failed to marshal candidate", zap.Error(err))
-			return
-		}
-
-		if err := signal.Send(&api.SignalMessage{
-			Payload: &api.SignalMessage_Trickle{Trickle: string(trickle)},
-		}); err != nil {
-			zap.L().Error("failed to send candidate", zap.Error(err))
-		}
-	})
 
 	peerConnection.OnTrack(func(tr *webrtc.TrackRemote, r *webrtc.RTPReceiver) {
 		c.Lock()
@@ -107,61 +70,31 @@ func NewClient(ctx context.Context, conn *grpc.ClientConn) (*Client, error) {
 	})
 
 	go func() {
+		for {
+			signal, err := signaller.ReadSignal()
+			if err != nil {
+				zap.L().Error("failed to read signal", zap.Error(err))
+				return
+			}
+			if err := signalClient.Send(signal); err != nil {
+				zap.L().Error("failed to send signal", zap.Error(err))
+				return
+			}
+		}
+	}()
+
+	go func() {
 		defer peerConnection.Close()
 		for {
-			in, err := signal.Recv()
+			in, err := signalClient.Recv()
 			if err != nil {
 				zap.L().Error("failed to receive", zap.Error(err))
 				return
 			}
 
-			switch payload := in.Payload.(type) {
-			case *api.SignalMessage_OfferSdp:
-				if err := peerConnection.SetRemoteDescription(webrtc.SessionDescription{
-					SDP:  payload.OfferSdp,
-					Type: webrtc.SDPTypeOffer,
-				}); err != nil {
-					zap.L().Error("failed to set remote description", zap.Error(err))
-					break
-				}
-				answer, err := peerConnection.CreateAnswer(nil)
-				if err != nil {
-					zap.L().Error("failed to create answer", zap.Error(err))
-					break
-				}
-
-				if err := peerConnection.SetLocalDescription(answer); err != nil {
-					zap.L().Error("failed to set local description", zap.Error(err))
-					break
-				}
-
-				if err := signal.Send(&api.SignalMessage{
-					Payload: &api.SignalMessage_AnswerSdp{AnswerSdp: answer.SDP},
-				}); err != nil {
-					zap.L().Error("failed to send answer", zap.Error(err))
-					break
-				}
-
-			case *api.SignalMessage_AnswerSdp:
-				if err := peerConnection.SetRemoteDescription(webrtc.SessionDescription{
-					SDP:  payload.AnswerSdp,
-					Type: webrtc.SDPTypeAnswer,
-				}); err != nil {
-					zap.L().Error("failed to set remote description", zap.Error(err))
-					break
-				}
-
-			case *api.SignalMessage_Trickle:
-				candidate := webrtc.ICECandidateInit{}
-				if err := json.Unmarshal([]byte(payload.Trickle), &candidate); err != nil {
-					zap.L().Error("failed to unmarshal candidate", zap.Error(err))
-					break
-				}
-
-				if err := peerConnection.AddICECandidate(candidate); err != nil {
-					zap.L().Error("failed to add candidate", zap.Error(err))
-					break
-				}
+			if err := signaller.WriteSignal(in); err != nil {
+				zap.L().Error("failed to write signal", zap.Error(err))
+				return
 			}
 		}
 	}()

@@ -2,17 +2,21 @@ package server
 
 import (
 	"context"
-	"encoding/json"
 	"sync"
 
 	"github.com/muxable/transcoder/api"
 	"github.com/muxable/transcoder/internal/peerconnection"
+	"github.com/muxable/transcoder/internal/pipeline"
 	"github.com/muxable/transcoder/internal/server"
-	"github.com/muxable/transcoder/pkg/transcode"
-	"github.com/pion/rtpio/pkg/rtpio"
 	"github.com/pion/webrtc/v3"
 	"go.uber.org/zap"
 )
+
+type Source struct {
+	*webrtc.PeerConnection
+	*webrtc.TrackRemote
+	*pipeline.Synchronizer
+}
 
 type TranscoderServer struct {
 	api.UnimplementedTranscoderServer
@@ -39,53 +43,12 @@ func (s *TranscoderServer) Signal(conn api.Transcoder_SignalServer) error {
 		return err
 	}
 
-	synchronizer, err := transcode.NewSynchronizer()
+	signaller := peerconnection.Negotiate(peerConnection)
+
+	synchronizer, err := pipeline.NewSynchronizer()
 	if err != nil {
 		return err
 	}
-
-	peerConnection.OnConnectionStateChange(func(pcs webrtc.PeerConnectionState) {
-		if pcs == webrtc.PeerConnectionStateClosed {
-			synchronizer.Close()
-		}
-	})
-
-	peerConnection.OnNegotiationNeeded(func() {
-		offer, err := peerConnection.CreateOffer(nil)
-		if err != nil {
-			zap.L().Error("failed to create offer", zap.Error(err))
-			return
-		}
-
-		if err := peerConnection.SetLocalDescription(offer); err != nil {
-			zap.L().Error("failed to set local description", zap.Error(err))
-			return
-		}
-
-		if err := conn.Send(&api.SignalMessage{
-			Payload: &api.SignalMessage_OfferSdp{OfferSdp: offer.SDP},
-		}); err != nil {
-			zap.L().Error("failed to send offer", zap.Error(err))
-		}
-	})
-
-	peerConnection.OnICECandidate(func(candidate *webrtc.ICECandidate) {
-		if candidate == nil {
-			return
-		}
-
-		trickle, err := json.Marshal(candidate.ToJSON())
-		if err != nil {
-			zap.L().Error("failed to marshal candidate", zap.Error(err))
-			return
-		}
-
-		if err := conn.Send(&api.SignalMessage{
-			Payload: &api.SignalMessage_Trickle{Trickle: string(trickle)},
-		}); err != nil {
-			zap.L().Error("failed to send candidate", zap.Error(err))
-		}
-	})
 
 	peerConnection.OnTrack(func(tr *webrtc.TrackRemote, r *webrtc.RTPReceiver) {
 		go func() {
@@ -108,6 +71,20 @@ func (s *TranscoderServer) Signal(conn api.Transcoder_SignalServer) error {
 		s.onTrack.L.Unlock()
 	})
 
+	go func() {
+		for {
+			signal, err := signaller.ReadSignal()
+			if err != nil {
+				zap.L().Error("failed to read signal", zap.Error(err))
+				return
+			}
+			if err := conn.Send(signal); err != nil {
+				zap.L().Error("failed to send signal", zap.Error(err))
+				return
+			}
+		}
+	}()
+
 	for {
 		in, err := conn.Recv()
 		if err != nil {
@@ -115,46 +92,9 @@ func (s *TranscoderServer) Signal(conn api.Transcoder_SignalServer) error {
 			return nil
 		}
 
-		switch payload := in.Payload.(type) {
-		case *api.SignalMessage_OfferSdp:
-			if err := peerConnection.SetRemoteDescription(webrtc.SessionDescription{
-				SDP:  payload.OfferSdp,
-				Type: webrtc.SDPTypeOffer,
-			}); err != nil {
-				return err
-			}
-			answer, err := peerConnection.CreateAnswer(nil)
-			if err != nil {
-				return err
-			}
-
-			if err := peerConnection.SetLocalDescription(answer); err != nil {
-				return err
-			}
-
-			if err := conn.Send(&api.SignalMessage{
-				Payload: &api.SignalMessage_AnswerSdp{AnswerSdp: answer.SDP},
-			}); err != nil {
-				return err
-			}
-
-		case *api.SignalMessage_AnswerSdp:
-			if err := peerConnection.SetRemoteDescription(webrtc.SessionDescription{
-				SDP:  payload.AnswerSdp,
-				Type: webrtc.SDPTypeAnswer,
-			}); err != nil {
-				return err
-			}
-
-		case *api.SignalMessage_Trickle:
-			candidate := webrtc.ICECandidateInit{}
-			if err := json.Unmarshal([]byte(payload.Trickle), &candidate); err != nil {
-				return err
-			}
-
-			if err := peerConnection.AddICECandidate(candidate); err != nil {
-				return err
-			}
+		if err := signaller.WriteSignal(in); err != nil {
+			zap.L().Error("failed to write signal", zap.Error(err))
+			return nil
 		}
 	}
 }
@@ -179,16 +119,16 @@ func (s *TranscoderServer) Transcode(ctx context.Context, request *api.Transcode
 		s.onTrack.L.Unlock()
 	}
 
-	options := []transcode.TranscoderOption{transcode.WithSynchronizer(matched.Synchronizer)}
+	options := []TranscoderOption{WithSynchronizer(matched.Synchronizer)}
 	if request.MimeType != "" {
-		options = append(options, transcode.ToOutputCodec(server.DefaultOutputCodecs[request.MimeType]))
+		options = append(options, ToOutputCodec(server.DefaultOutputCodecs[request.MimeType]))
 	}
 	if request.GstreamerPipeline != "" {
-		options = append(options, transcode.ViaGStreamerEncoder(request.GstreamerPipeline))
+		options = append(options, ViaGStreamerEncoder(request.GstreamerPipeline))
 	}
 
 	// tr is the remote track that matches the request.
-	transcoder, err := transcode.NewTranscoder(matched.TrackRemote.Codec(), options...)
+	transcoder, err := NewTranscoder(matched.TrackRemote.Codec(), options...)
 	if err != nil {
 		return nil, err
 	}
@@ -209,7 +149,7 @@ func (s *TranscoderServer) Transcode(ctx context.Context, request *api.Transcode
 			}
 		}
 	}()
-	go rtpio.CopyRTP(tl, transcoder)
+	// go rtpio.CopyRTP(tl, transcoder)
 
 	rtpSender, err := matched.PeerConnection.AddTrack(tl)
 	if err != nil {
