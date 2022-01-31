@@ -5,5 +5,5 @@
 
 gboolean cgoBusFunc(GstBus *bus, GstMessage *msg, gpointer user_data)
 {
-    return goBusFunc(bus, msg);
+    return goBusFunc(bus, msg, user_data);
 }

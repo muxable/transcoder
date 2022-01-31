@@ -18,6 +18,8 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/google/uuid"
+	"github.com/mattn/go-pointer"
 	"github.com/pion/rtpio/pkg/rtpio"
 	"go.uber.org/zap"
 )
@@ -27,13 +29,21 @@ func init() {
 }
 
 type Synchronizer struct {
+	id   uuid.UUID
 	bin  *C.GstBin
 	ctx  *C.GMainContext
 	loop *C.GMainLoop
+
+	closed bool
 }
 
 func NewSynchronizer() (*Synchronizer, error) {
-	pipeline := C.gst_pipeline_new(nil)
+	id := uuid.New()
+
+	cname := C.CString(id.String())
+	defer C.free(unsafe.Pointer(cname))
+
+	pipeline := C.gst_pipeline_new(cname)
 
 	if C.gst_element_set_state(pipeline, C.GST_STATE_PLAYING) == C.GST_STATE_CHANGE_FAILURE {
 		return nil, errors.New("failed to set pipeline to playing")
@@ -42,22 +52,26 @@ func NewSynchronizer() (*Synchronizer, error) {
 	loop := C.g_main_loop_new(ctx, C.int(0))
 	watch := C.gst_bus_create_watch(C.gst_pipeline_get_bus((*C.GstPipeline)(unsafe.Pointer(pipeline))))
 
-	C.g_source_set_callback(watch, C.GSourceFunc(C.cgoBusFunc), nil, nil)
+	s := &Synchronizer{
+		id:   id,
+		bin:  (*C.GstBin)(unsafe.Pointer(pipeline)),
+		ctx:  ctx,
+		loop: loop,
+	}
+
+	C.g_source_set_callback(watch, C.GSourceFunc(C.cgoBusFunc), C.gpointer(pointer.Save(s)), nil)
 
 	if C.g_source_attach(watch, ctx) == 0 {
 		return nil, errors.New("failed to add bus watch")
 	}
 	defer C.g_source_unref(watch)
 
-	s := &Synchronizer{
-		bin:  (*C.GstBin)(unsafe.Pointer(pipeline)),
-		ctx:  ctx,
-		loop: loop,
-	}
-
 	go C.g_main_loop_run(loop)
 
 	runtime.SetFinalizer(s, func(synchronizer *Synchronizer) {
+		if err := synchronizer.Close(); err != nil {
+			zap.L().Error("failed to close synchronizer", zap.Error(err))
+		}
 		C.gst_object_unref(C.gpointer(unsafe.Pointer(synchronizer.bin)))
 		C.g_main_loop_unref(synchronizer.loop)
 		C.g_main_context_unref(synchronizer.ctx)
@@ -67,13 +81,20 @@ func NewSynchronizer() (*Synchronizer, error) {
 }
 
 func (s *Synchronizer) Close() error {
-	C.gst_element_set_state((*C.GstElement)(unsafe.Pointer(s.bin)), C.GST_STATE_NULL)
+	if s.closed {
+		return nil
+	}
+	s.closed = true
+	if C.gst_element_set_state((*C.GstElement)(unsafe.Pointer(s.bin)), C.GST_STATE_NULL) == C.GST_STATE_CHANGE_FAILURE {
+		return errors.New("failed to set pipeline to null")
+	}
 	C.g_main_loop_quit(s.loop)
 	return nil
 }
 
 //export goBusFunc
-func goBusFunc(bus *C.GstBus, msg *C.GstMessage) C.gboolean {
+func goBusFunc(bus *C.GstBus, msg *C.GstMessage, ptr C.gpointer) C.gboolean {
+	s := pointer.Restore(unsafe.Pointer(ptr)).(*Synchronizer)
 	switch msg._type {
 	case C.GST_MESSAGE_ERROR:
 		var gerr *C.GError
@@ -85,7 +106,7 @@ func goBusFunc(bus *C.GstBus, msg *C.GstMessage) C.gboolean {
 		}()
 		defer C.g_free(C.gpointer(unsafe.Pointer(debugInfo)))
 		C.gst_message_parse_error(msg, (**C.GError)(unsafe.Pointer(&gerr)), (**C.gchar)(unsafe.Pointer(&debugInfo)))
-		zap.L().Error(C.GoString(gerr.message), zap.String("debug", C.GoString(debugInfo)))
+		zap.L().Error(C.GoString(gerr.message), zap.String("id", s.id.String()), zap.String("debug", C.GoString(debugInfo)))
 	case C.GST_MESSAGE_WARNING:
 		var gerr *C.GError
 		var debugInfo *C.gchar
@@ -96,7 +117,7 @@ func goBusFunc(bus *C.GstBus, msg *C.GstMessage) C.gboolean {
 		}()
 		defer C.g_free(C.gpointer(unsafe.Pointer(debugInfo)))
 		C.gst_message_parse_warning(msg, (**C.GError)(unsafe.Pointer(&gerr)), (**C.gchar)(unsafe.Pointer(&debugInfo)))
-		zap.L().Warn(C.GoString(gerr.message), zap.String("debug", C.GoString(debugInfo)))
+		zap.L().Warn(C.GoString(gerr.message), zap.String("id", s.id.String()), zap.String("debug", C.GoString(debugInfo)))
 	case C.GST_MESSAGE_INFO:
 		var gerr *C.GError
 		var debugInfo *C.gchar
@@ -107,7 +128,7 @@ func goBusFunc(bus *C.GstBus, msg *C.GstMessage) C.gboolean {
 		}()
 		defer C.g_free(C.gpointer(unsafe.Pointer(debugInfo)))
 		C.gst_message_parse_info(msg, (**C.GError)(unsafe.Pointer(&gerr)), (**C.gchar)(unsafe.Pointer(&debugInfo)))
-		zap.L().Info(C.GoString(gerr.message), zap.String("debug", C.GoString(debugInfo)))
+		zap.L().Info(C.GoString(gerr.message), zap.String("id", s.id.String()), zap.String("debug", C.GoString(debugInfo)))
 	case C.GST_MESSAGE_QOS:
 		var live C.gboolean
 		var runningTime, streamTime, timestamp, duration C.guint64
@@ -119,30 +140,39 @@ func goBusFunc(bus *C.GstBus, msg *C.GstMessage) C.gboolean {
 			zap.Duration("timestamp", time.Duration(timestamp)),
 			zap.Duration("duration", time.Duration(duration)))
 	default:
-		zap.L().Debug("pipeline message", zap.String("type", C.GoString(C.gst_message_type_get_name(msg._type))))
+		zap.L().Debug(C.GoString(C.gst_message_type_get_name(msg._type)), zap.String("id", s.id.String()), zap.Uint32("seqnum", uint32(msg.seqnum)))
 	}
 	return C.gboolean(1)
 }
 
-type ReadOnlyPipeline interface {
-	io.ReadCloser
-	rtpio.RTPReadCloser
-	ReadSample() (*Sample, error)
+type Pipeline interface {
+	io.Closer
 	GetElement(name string) (*Element, error)
+}
+
+type ReadOnlyPipeline interface {
+	Pipeline
+	io.Reader
+	rtpio.RTPReader
+	ReadSample() (*Sample, error)
 	WaitForEndOfStream()
 }
 
 type WriteOnlyPipeline interface {
-	io.WriteCloser
-	rtpio.RTPWriteCloser
+	Pipeline
+	io.Writer
+	rtpio.RTPWriter
 	WriteSample(*Sample) error
-	GetElement(name string) (*Element, error)
 	SendEndOfStream() error
 }
 
 type ReadWritePipeline interface {
 	ReadOnlyPipeline
 	WriteOnlyPipeline
+}
+
+func (s *Synchronizer) NewPipeline(str string) (Pipeline, error) {
+	return newUnsafePipeline(s, str)
 }
 
 func (s *Synchronizer) NewReadOnlyPipeline(str string) (ReadOnlyPipeline, error) {

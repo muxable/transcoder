@@ -4,7 +4,7 @@
 #include <glib.h>
 #include <gst/gst.h>
 
-extern gboolean goBusFunc(GstBus *, GstMessage *);
+extern gboolean goBusFunc(GstBus *, GstMessage *, gpointer);
 
 gboolean cgoBusFunc(GstBus *, GstMessage *, gpointer);
 

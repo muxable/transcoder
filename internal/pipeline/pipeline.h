@@ -8,4 +8,6 @@ extern void goEOSFunc(GstElement *, gpointer);
 
 void cgoEOSFunc(GstElement *, gpointer);
 
+gpointer g_memdup_compat(gconstpointer, gsize);
+
 #endif

@@ -20,6 +20,7 @@ import (
 
 	"github.com/mattn/go-pointer"
 	"github.com/pion/rtp"
+	"go.uber.org/zap"
 )
 
 type unsafePipeline struct {
@@ -30,6 +31,8 @@ type unsafePipeline struct {
 	sink   *C.GstAppSink
 
 	eos sync.Mutex
+
+	closed bool
 }
 
 func newUnsafePipeline(synchronizer *Synchronizer, pipeline string) (*unsafePipeline, error) {
@@ -83,6 +86,9 @@ func newUnsafePipeline(synchronizer *Synchronizer, pipeline string) (*unsafePipe
 	}
 
 	runtime.SetFinalizer(p, func(pipeline *unsafePipeline) {
+		if err := pipeline.Close(); err != nil {
+			zap.L().Error("failed to close pipeline", zap.Error(err))
+		}
 		if pipeline.source != nil {
 			C.gst_object_unref(C.gpointer(unsafe.Pointer(pipeline.source)))
 		}
@@ -148,15 +154,15 @@ func (p *unsafePipeline) ReadSample() (*Sample, error) {
 	defer C.free(unsafe.Pointer(copy))
 
 	var duration, pts, dts *time.Duration
-	if cbuf.duration != C.GST_CLOCK_TIME_NONE {
+	if time.Duration(cbuf.duration) != C.GST_CLOCK_TIME_NONE {
 		d := (time.Duration(cbuf.duration) * time.Nanosecond)
 		duration = &d
 	}
-	if cbuf.pts != C.GST_CLOCK_TIME_NONE {
+	if time.Duration(cbuf.pts) != C.GST_CLOCK_TIME_NONE {
 		p := (time.Duration(cbuf.pts) * time.Nanosecond)
 		pts = &p
 	}
-	if cbuf.dts != C.GST_CLOCK_TIME_NONE {
+	if time.Duration(cbuf.dts) != C.GST_CLOCK_TIME_NONE {
 		d := (time.Duration(cbuf.dts) * time.Nanosecond)
 		dts = &d
 	}
@@ -192,7 +198,7 @@ func (p *unsafePipeline) Write(buf []byte) (int, error) {
 func (p *unsafePipeline) WriteSample(b *Sample) error {
 	cbuf := C.CBytes(b.Data)
 	defer C.free(cbuf)
-	cpbuf := C.g_memdup(C.gconstpointer(cbuf), C.uint(len(b.Data)))
+	cpbuf := C.g_memdup_compat(C.gconstpointer(cbuf), C.ulong(len(b.Data)))
 	gstbuf := C.gst_buffer_new_wrapped(cpbuf, C.ulong(len(b.Data)))
 
 	if b.PTS != nil {
@@ -223,6 +229,10 @@ func (p *unsafePipeline) WriteRTP(pkt *rtp.Packet) error {
 }
 
 func (p *unsafePipeline) Close() error {
+	if p.closed {
+		return nil
+	}
+	p.closed = true
 	if C.gst_element_set_state(p.element, C.GST_STATE_NULL) == C.GST_STATE_CHANGE_FAILURE {
 		return errors.New("failed to set element to NULL")
 	}
@@ -244,5 +254,5 @@ func (p *unsafePipeline) SendEndOfStream() error {
 
 func (p *unsafePipeline) WaitForEndOfStream() {
 	p.eos.Lock()
-	p.eos.Unlock()
+	defer p.eos.Unlock()
 }

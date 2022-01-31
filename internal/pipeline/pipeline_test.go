@@ -95,8 +95,8 @@ func TestPipeline_ReadOnly(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if len(sample.Data) != 240*160*3 {
-			t.Fatalf("got %d, want %d", len(sample.Data), 240*160*3)
+		if len(sample.Data) % 3 != 0 {
+			t.Fatalf("got %d, want multiple of 3", len(sample.Data))
 		}
 		if sample.Offset != i {
 			t.Fatalf("got %d, want %d", sample.Offset, i)
@@ -203,3 +203,79 @@ func TestPipeline_EOS(t *testing.T) {
 
 	wg.Wait()
 }
+
+func TestPipeline_SealedPipeline(t *testing.T) {
+	logger := zaptest.NewLogger(t)
+	defer logger.Sync()
+	undo := zap.ReplaceGlobals(logger)
+	defer undo()
+
+	defer goleak.VerifyNone(t)
+
+	a, err := NewSynchronizer()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer a.Close()
+	
+	b, err := NewSynchronizer()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer b.Close()
+
+	_, err = a.NewPipeline("audiotestsrc ! autoaudiosink")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	time.Sleep(10 * time.Second)
+
+}
+
+// func TestPipeline_RTPPiping(t *testing.T) {
+// 	logger := zaptest.NewLogger(t)
+// 	defer logger.Sync()
+// 	undo := zap.ReplaceGlobals(logger)
+// 	defer undo()
+
+// 	defer goleak.VerifyNone(t)
+
+// 	a, err := NewSynchronizer()
+// 	if err != nil {
+// 		t.Fatal(err)
+// 	}
+// 	defer a.Close()
+	
+// 	b, err := NewSynchronizer()
+// 	if err != nil {
+// 		t.Fatal(err)
+// 	}
+// 	defer b.Close()
+
+// 	p1, err := a.NewReadOnlyPipeline("videotestsrc")
+// 	if err != nil {
+// 		t.Fatal(err)
+// 	}
+
+// 	p2, err := b.NewWriteOnlyPipeline("autovideosink")
+// 	if err != nil {
+// 		t.Fatal(err)
+// 	}
+
+// 	go func () {
+// 		for {
+// 			s, err := p1.ReadSample()
+// 			if err != nil {
+// 				return
+// 			}
+// 			if err := p2.WriteSample(s); err != nil {
+// 				return
+// 			}
+// 		}
+// 	}()
+
+// 	time.Sleep(10 * time.Second)
+
+
+// }
