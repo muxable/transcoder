@@ -32,7 +32,7 @@ func NewTranscoder(from webrtc.RTPCodecParameters, options ...TranscoderOption) 
 
 	if t.outputCodec == nil {
 		if strings.HasPrefix(from.MimeType, "video") {
-			codec := codecs.DefaultOutputCodecs[webrtc.MimeTypeVP8]
+			codec := codecs.DefaultOutputCodecs[webrtc.MimeTypeH264]
 			t.outputCodec = &codec
 		} else if strings.HasPrefix(from.MimeType, "audio") {
 			codec := codecs.DefaultOutputCodecs[webrtc.MimeTypeOpus]
