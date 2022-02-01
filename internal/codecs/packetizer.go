@@ -1,4 +1,4 @@
-package server
+package codecs
 
 import (
 	"math/rand"

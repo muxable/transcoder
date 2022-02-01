@@ -13,6 +13,7 @@ import "C"
 import (
 	"errors"
 	"io"
+	"log"
 	"math"
 	"net"
 	"runtime"
@@ -183,6 +184,7 @@ func (p *unsafePipeline) ReadRTP() (*rtp.Packet, error) {
 	if err := pkt.Unmarshal(buf[:n]); err != nil {
 		return nil, err
 	}
+	log.Printf("%v %v", pkt.SequenceNumber, pkt.MarshalSize())
 	return pkt, nil
 }
 

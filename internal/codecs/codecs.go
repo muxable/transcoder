@@ -1,9 +1,8 @@
-package server
+package codecs
 
 import (
-	"fmt"
-	"strings"
-
+	"github.com/pion/rtp"
+	"github.com/pion/rtp/codecs"
 	"github.com/pion/webrtc/v3"
 )
 
@@ -129,115 +128,64 @@ var DefaultOutputCodecs = map[string]webrtc.RTPCodecParameters{
 }
 
 type GStreamerParameters struct {
-	Depayloader, DefaultEncoder, Payloader string
-	ToCaps                                 func(webrtc.RTPCodecParameters) string
-}
-type CodecMapping struct {
-	GStreamerParameters
+	Caps, Depayloader, DefaultEncoder, Payloader string
 }
 
 var SupportedCodecs = map[string]GStreamerParameters{
 	webrtc.MimeTypeH264: {
-		"rtph264depay", "x264enc speed-preset=veryfast tune=zerolatency key-int-max=20", "rtph264pay config-interval=1",
-		func(c webrtc.RTPCodecParameters) string {
-			return fmt.Sprintf("encoding-name=H264,clock-rate=%d,payload=%d,packetization-mode=(string)1,profile-level-id=(string)42001f", c.ClockRate, c.PayloadType)
-		},
+		"encoding-name=H264,packetization-mode=(string)1,profile-level-id=(string)42001f",
+		"rtph264depay", "x264enc speed-preset=veryfast tune=zerolatency key-int-max=20", "rtph264pay",
 	},
 	webrtc.MimeTypeH265: {
-		"rtph265depay", "x265enc speed-preset=ultrafast tune=zerolatency key-int-max=20", "rtph265pay",
-		func(c webrtc.RTPCodecParameters) string {
-			return fmt.Sprintf("encoding-name=H265,clock-rate=%d,payload=%d", c.ClockRate, c.PayloadType)
-		},
+		"encoding-name=H265", "rtph265depay", "x265enc speed-preset=ultrafast tune=zerolatency key-int-max=20", "rtph265pay",
 	},
 	webrtc.MimeTypeVP8: {
-		"rtpvp8depay", "vp8enc end-usage=cq error-resilient=partitions keyframe-max-dist=10 auto-alt-ref=true cpu-used=5", "rtpvp8pay",
-		func(c webrtc.RTPCodecParameters) string {
-			return fmt.Sprintf("encoding-name=VP8,clock-rate=%d,payload=%d", c.ClockRate, c.PayloadType)
-		},
+		"encoding-name=VP8", "rtpvp8depay", "vp8enc end-usage=cq error-resilient=partitions keyframe-max-dist=10 auto-alt-ref=true cpu-used=5", "rtpvp8pay",
 	},
 	webrtc.MimeTypeVP9: {
-		"rtpvp9depay", "vp9enc end-usage=cq error-resilient=partitions keyframe-max-dist=10 auto-alt-ref=true cpu-used=5", "rtpvp9pay",
-		func(c webrtc.RTPCodecParameters) string {
-			return fmt.Sprintf("encoding-name=VP9,clock-rate=%d,payload=%d", c.ClockRate, c.PayloadType)
-		},
+		"encoding-name=VP9", "rtpvp9depay", "vp9enc end-usage=cq error-resilient=partitions keyframe-max-dist=10 auto-alt-ref=true cpu-used=5", "rtpvp9pay",
 	},
 	// webrtc.MimeTypeAV1: {
 	// 	"rtpav1depay", "av1enc deadline=1", "rtpav1pay",
 	// 	func(c webrtc.RTPCodecParameters) string {
-	// 		return fmt.Sprintf("encoding-name=AV1,clock-rate=%d,payload=%d", c.ClockRate, c.PayloadType)
+	// 		return fmt.Sprintf("encoding-name=AV1", c.ClockRate, c.PayloadType)
 	// 	},
 	// },
 
-	webrtc.MimeTypeOpus: {"rtpopusdepay", "opusenc inband-fec=true", "rtpopuspay",
-		func(c webrtc.RTPCodecParameters) string {
-			return fmt.Sprintf("encoding-name=OPUS,clock-rate=%d,payload=%d", c.ClockRate, c.PayloadType)
-		},
+	webrtc.MimeTypeOpus: {
+		"encoding-name=OPUS", "rtpopusdepay", "opusenc inband-fec=true", "rtpopuspay",
 	},
 	"audio/AAC": {
-		"rtpmp4adepay", "avenc_aac", "rtpmp4apay",
-		func(c webrtc.RTPCodecParameters) string {
-			return fmt.Sprintf("encoding-name=MP4A-LATM,clock-rate=%d,payload=%d,cpresent=(string)0,config=(string)40002320", c.ClockRate, c.PayloadType)
-		},
+		"encoding-name=MP4A-LATM,cpresent=(string)0,config=(string)40002320", "rtpmp4adepay", "avenc_aac", "rtpmp4apay",
 	},
 	"audio/SPEEX": {
-		"rtpspeexdepay", "speexenc", "rtpspeexpay",
-		func(c webrtc.RTPCodecParameters) string {
-			return fmt.Sprintf("encoding-name=SPEEX,clock-rate=%d,payload=%d", c.ClockRate, c.PayloadType)
-		},
+		"encoding-name=SPEEX", "rtpspeexdepay", "speexenc", "rtpspeexpay",
 	},
 	webrtc.MimeTypeG722: {
-		"rtpg722depay", "avenc_g722", "rtpg722pay",
-		func(c webrtc.RTPCodecParameters) string {
-			return fmt.Sprintf("clock-rate=%d,payload=%d", c.ClockRate, c.PayloadType)
-		},
+		"", "rtpg722depay", "avenc_g722", "rtpg722pay",
 	},
 	webrtc.MimeTypePCMA: {
-		"rtppcmadepay", "alawenc", "rtppcmapay",
-		func(c webrtc.RTPCodecParameters) string {
-			return fmt.Sprintf("encoding-name=PCMA,clock-rate=%d,payload=%d", c.ClockRate, c.PayloadType)
-		},
+		"encoding-name=PCMA", "rtppcmadepay", "alawenc", "rtppcmapay",
 	},
 	webrtc.MimeTypePCMU: {
-		"rtppcmudepay", "mulawenc", "rtppcmupay",
-		func(c webrtc.RTPCodecParameters) string {
-			return fmt.Sprintf("encoding-name=PCMU,clock-rate=%d,payload=%d", c.ClockRate, c.PayloadType)
-		},
+		"encoding-name=PCMU", "rtppcmudepay", "mulawenc", "rtppcmupay",
 	},
 	"audio/AC3": {
-		"rtpac3depay", "avenc_ac3", "rtpac3pay",
-		func(c webrtc.RTPCodecParameters) string {
-			return fmt.Sprintf("encoding-name=AC3,clock-rate=%d,payload=%d", c.ClockRate, c.PayloadType)
-		},
+		"encoding-name=AC3", "rtpac3depay", "avenc_ac3", "rtpac3pay",
 	},
 }
 
-func PipelineString(from, to webrtc.RTPCodecParameters, encoder string) (string, error) {
-	fromParameters, ok := SupportedCodecs[from.MimeType]
-	if !ok {
-		return "", fmt.Errorf("unsupported codec %s", from.MimeType)
-	}
-	toParameters, ok := SupportedCodecs[to.MimeType]
-	if !ok {
-		return "", fmt.Errorf("unsupported codec %s", to.MimeType)
-	}
+var NativeDepayloader = map[string]rtp.Depacketizer {
+	webrtc.MimeTypeH264: &codecs.H264Packet{},
+	webrtc.MimeTypeVP8:  &codecs.VP8Packet{},
+	webrtc.MimeTypeVP9:  &codecs.VP9Packet{},
+	webrtc.MimeTypeOpus: &codecs.OpusPacket{},
+}
 
-	if encoder == "" {
-		encoder = toParameters.DefaultEncoder
-	}
-
-	if strings.HasPrefix(from.MimeType, "video") {
-		inputCaps := fmt.Sprintf("application/x-rtp,media=(string)video,%s", fromParameters.ToCaps(from))
-
-		return fmt.Sprintf(
-			"%s ! decodebin ! queue ! videoconvert ! videorate ! %s ! %s",
-			inputCaps, encoder, toParameters.Payloader), nil
-	} else if strings.HasPrefix(from.MimeType, "audio") {
-		inputCaps := fmt.Sprintf("application/x-rtp,media=(string)audio,%s", fromParameters.ToCaps(from))
-
-		return fmt.Sprintf(
-			"%s ! %s ! queue ! decodebin ! queue ! audioconvert ! audioresample ! %s ! %s mtu=1200",
-			inputCaps, fromParameters.Depayloader, encoder, toParameters.Payloader), nil
-	}
-	return "", fmt.Errorf("unsupported codec %s", from.MimeType)
-
+var NativePayloader = map[string]rtp.Payloader {
+	webrtc.MimeTypeH264: &codecs.H264Payloader{},
+	webrtc.MimeTypeVP8:  &codecs.VP8Payloader{},
+	webrtc.MimeTypeVP9:  &codecs.VP9Payloader{},
+	webrtc.MimeTypeOpus: &codecs.OpusPayloader{},
+	webrtc.MimeTypeG722: &codecs.G722Payloader{},
 }

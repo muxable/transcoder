@@ -5,9 +5,9 @@ import (
 	"sync"
 
 	"github.com/muxable/transcoder/api"
+	"github.com/muxable/transcoder/internal/codecs"
 	"github.com/muxable/transcoder/internal/peerconnection"
 	"github.com/muxable/transcoder/internal/pipeline"
-	"github.com/muxable/transcoder/internal/server"
 	"github.com/pion/rtpio/pkg/rtpio"
 	"github.com/pion/webrtc/v3"
 	"go.uber.org/zap"
@@ -122,7 +122,7 @@ func (s *TranscoderServer) Transcode(ctx context.Context, request *api.Transcode
 
 	options := []TranscoderOption{WithSynchronizer(matched.Synchronizer)}
 	if request.MimeType != "" {
-		options = append(options, ToOutputCodec(server.DefaultOutputCodecs[request.MimeType]))
+		options = append(options, ToOutputCodec(codecs.DefaultOutputCodecs[request.MimeType]))
 	}
 	if request.GstreamerPipeline != "" {
 		options = append(options, ViaGStreamerEncoder(request.GstreamerPipeline))

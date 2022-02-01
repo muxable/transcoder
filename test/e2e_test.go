@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/muxable/transcoder/internal/codecs"
 	"github.com/muxable/transcoder/internal/pipeline"
-	"github.com/muxable/transcoder/internal/server"
 	pkg_server "github.com/muxable/transcoder/pkg/server"
 	"github.com/pion/rtpio/pkg/rtpio"
 	"github.com/pion/webrtc/v3"
@@ -17,14 +17,14 @@ import (
 
 func TestTranscoding(t *testing.T) {
 	t.Skip("test must be manually run")
-	for mime, codec := range server.SupportedCodecs {
+	for mime, codec := range codecs.SupportedCodecs {
 		t.Run(mime, func(t *testing.T) {
 			runTranscoder(t, mime, codec)
 		})
 	}
 }
 
-func construct(t *testing.T, mime string, codec server.GStreamerParameters) (webrtc.RTPCodecParameters, webrtc.RTPCodecParameters, pipeline.ReadOnlyPipeline, pipeline.WriteOnlyPipeline) {
+func construct(t *testing.T, mime string, codec codecs.GStreamerParameters) (webrtc.RTPCodecParameters, webrtc.RTPCodecParameters, pipeline.ReadOnlyPipeline, pipeline.WriteOnlyPipeline) {
 	rs, err := pipeline.NewSynchronizer()
 	if err != nil {
 		t.Fatal(err)
@@ -33,25 +33,25 @@ func construct(t *testing.T, mime string, codec server.GStreamerParameters) (web
 	if err != nil {
 		t.Fatal(err)
 	}
-	oc := server.DefaultOutputCodecs[mime]
+	oc := codecs.DefaultOutputCodecs[mime]
 	if strings.HasPrefix(mime, "audio") {
-		ic := server.DefaultOutputCodecs[webrtc.MimeTypeOpus]
+		ic := codecs.DefaultOutputCodecs[webrtc.MimeTypeOpus]
 		p, err := rs.NewReadOnlyPipeline(fmt.Sprintf("audiotestsrc is-live=true num-buffers=100 ! opusenc ! rtpopuspay pt=%d mtu=1200", ic.PayloadType))
 		if err != nil {
 			t.Fatal(err)
 		}
-		q, err := ws.NewWriteOnlyPipeline(fmt.Sprintf("application/x-rtp,%s ! %s ! queue ! decodebin ! audioconvert ! autoaudiosink", codec.ToCaps(oc), codec.Depayloader))
+		q, err := ws.NewWriteOnlyPipeline(fmt.Sprintf("application/x-rtp,%s,clock-rate=%d,payload=%d ! queue ! decodebin ! audioconvert ! autoaudiosink", codec.Caps, ic.ClockRate, ic.PayloadType))
 		if err != nil {
 			t.Fatal(err)
 		}
 		return ic, oc, p, q
 	} else {
-		ic := server.DefaultOutputCodecs[webrtc.MimeTypeH264]
+		ic := codecs.DefaultOutputCodecs[webrtc.MimeTypeH264]
 		p, err := rs.NewReadOnlyPipeline(fmt.Sprintf("videotestsrc is-live=true num-buffers=100 ! x264enc ! rtph264pay pt=%d mtu=1200", ic.PayloadType))
 		if err != nil {
 			t.Fatal(err)
 		}
-		q, err := ws.NewWriteOnlyPipeline(fmt.Sprintf("application/x-rtp,%s ! %s ! queue ! decodebin ! videoconvert ! autovideosink", codec.ToCaps(oc), codec.Depayloader))
+		q, err := ws.NewWriteOnlyPipeline(fmt.Sprintf("application/x-rtp,%s,clock-rate=%d,payload=%d ! queue ! decodebin ! videoconvert ! autovideosink", codec.Caps, ic.ClockRate, ic.PayloadType))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -59,7 +59,7 @@ func construct(t *testing.T, mime string, codec server.GStreamerParameters) (web
 	}
 }
 
-func runTranscoder(t *testing.T, mime string, codec server.GStreamerParameters) {
+func runTranscoder(t *testing.T, mime string, codec codecs.GStreamerParameters) {
 	logger := zaptest.NewLogger(t)
 	defer logger.Sync()
 	undo := zap.ReplaceGlobals(logger)
