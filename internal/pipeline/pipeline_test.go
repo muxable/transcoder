@@ -87,7 +87,6 @@ func TestPipeline_ReadOnly(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer p.Close()
 
 	// read some data.
 	for i := 0; i < 100; i++ {
@@ -220,7 +219,6 @@ func TestPipeline_RTPPiping(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer p1.Close()
 
 	b, err := NewSynchronizer()
 	if err != nil {

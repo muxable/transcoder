@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"testing"
 
@@ -16,6 +17,9 @@ import (
 )
 
 func TestTranscoding(t *testing.T) {
+	if os.Getenv("CI") != "" {
+		t.Skip("Skipping testing in CI environment")
+	}
 	for mime, codec := range server.SupportedCodecs {
 		t.Run(mime, func(t *testing.T) {
 			runTranscoder(t, mime, codec)
