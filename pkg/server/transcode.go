@@ -70,6 +70,7 @@ func NewTranscoder(from webrtc.RTPCodecParameters, options ...TranscoderOption) 
 	// TODO: support native depacketizers
 	elements = append(elements,
 		fmt.Sprintf("application/x-rtp,%s,clock-rate=%d,payload=%d", inputParams.Caps, t.inputCodec.ClockRate, t.inputCodec.PayloadType),
+		"rtpjitterbuffer",  // TODO: remove this if we can use appsrc maybe?
 		inputParams.Depayloader)
 
 	// construct the conversion pipeline
