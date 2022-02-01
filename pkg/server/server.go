@@ -8,6 +8,7 @@ import (
 	"github.com/muxable/transcoder/internal/peerconnection"
 	"github.com/muxable/transcoder/internal/pipeline"
 	"github.com/muxable/transcoder/internal/server"
+	"github.com/pion/rtpio/pkg/rtpio"
 	"github.com/pion/webrtc/v3"
 	"go.uber.org/zap"
 )
@@ -149,7 +150,7 @@ func (s *TranscoderServer) Transcode(ctx context.Context, request *api.Transcode
 			}
 		}
 	}()
-	// go rtpio.CopyRTP(tl, transcoder)
+	go rtpio.CopyRTP(tl, transcoder)
 
 	rtpSender, err := matched.PeerConnection.AddTrack(tl)
 	if err != nil {
