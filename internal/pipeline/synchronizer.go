@@ -14,6 +14,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"runtime"
 	"time"
 	"unsafe"
@@ -146,7 +147,6 @@ func goBusFunc(bus *C.GstBus, msg *C.GstMessage, ptr C.gpointer) C.gboolean {
 }
 
 type Pipeline interface {
-	io.Closer
 	GetElement(name string) (*Element, error)
 }
 
@@ -154,16 +154,14 @@ type ReadOnlyPipeline interface {
 	Pipeline
 	io.Reader
 	rtpio.RTPReader
-	ReadSample() (*Sample, error)
-	WaitForEndOfStream()
+	ReadBuffer() (*Buffer, error)
 }
 
 type WriteOnlyPipeline interface {
 	Pipeline
-	io.Writer
-	rtpio.RTPWriter
-	WriteSample(*Sample) error
-	SendEndOfStream() error
+	io.WriteCloser
+	rtpio.RTPWriteCloser
+	// WriteBuffer(*Buffer) error
 }
 
 type ReadWritePipeline interface {
@@ -171,18 +169,36 @@ type ReadWritePipeline interface {
 	WriteOnlyPipeline
 }
 
+func unusedPort() (int, error) {
+	// get an unused udp port.
+	conn, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 0})
+	if err != nil {
+		return 0, err
+	}
+	defer conn.Close()
+	return conn.LocalAddr().(*net.UDPAddr).Port, nil
+}
+
 func (s *Synchronizer) NewPipeline(str string) (Pipeline, error) {
-	return newUnsafePipeline(s, str)
+	return newUnsafePipeline(s, str, nil)
 }
 
 func (s *Synchronizer) NewReadOnlyPipeline(str string) (ReadOnlyPipeline, error) {
-	return newUnsafePipeline(s, fmt.Sprintf("%s ! appsink name=internal-sink sync=false async=false", str))
+	return newUnsafePipeline(s, fmt.Sprintf("%s ! queue ! appsink name=internal-sink sync=false async=false", str), nil)
 }
 
 func (s *Synchronizer) NewWriteOnlyPipeline(str string) (WriteOnlyPipeline, error) {
-	return newUnsafePipeline(s, fmt.Sprintf("appsrc format=time name=internal-source ! %s", str))
+	writePort, err := unusedPort()
+	if err != nil {
+		return nil, err
+	}
+	return newUnsafePipeline(s, fmt.Sprintf("udpsrc address=127.0.0.1 port=%d name=internal-source ! queue ! %s", writePort, str), &writePort)
 }
 
 func (s *Synchronizer) NewReadWritePipeline(str string) (ReadWritePipeline, error) {
-	return newUnsafePipeline(s, fmt.Sprintf("appsrc format=time name=internal-source ! %s ! appsink name=internal-sink sync=false async=false", str))
+	writePort, err := unusedPort()
+	if err != nil {
+		return nil, err
+	}
+	return newUnsafePipeline(s, fmt.Sprintf("udpsrc address=127.0.0.1 port=%d name=internal-source ! queue ! %s ! queue ! appsink name=internal-sink sync=false async=false", writePort, str), &writePort)
 }

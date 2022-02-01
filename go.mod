@@ -23,7 +23,7 @@ require (
 )
 
 require (
-	github.com/google/uuid v1.3.0 // indirect
+	github.com/google/uuid v1.3.0
 	github.com/pion/datachannel v1.5.2 // indirect
 	github.com/pion/dtls/v2 v2.1.0 // indirect
 	github.com/pion/ice/v2 v2.1.18 // indirect

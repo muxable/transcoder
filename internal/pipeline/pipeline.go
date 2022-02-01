@@ -13,12 +13,12 @@ import "C"
 import (
 	"errors"
 	"io"
+	"math"
+	"net"
 	"runtime"
-	"sync"
 	"time"
 	"unsafe"
 
-	"github.com/mattn/go-pointer"
 	"github.com/pion/rtp"
 	"go.uber.org/zap"
 )
@@ -29,13 +29,10 @@ type unsafePipeline struct {
 
 	source *C.GstAppSrc
 	sink   *C.GstAppSink
-
-	eos sync.Mutex
-
-	closed bool
+	write  *net.UDPConn
 }
 
-func newUnsafePipeline(synchronizer *Synchronizer, pipeline string) (*unsafePipeline, error) {
+func newUnsafePipeline(synchronizer *Synchronizer, pipeline string, write *int) (*unsafePipeline, error) {
 	cstr := C.CString(pipeline)
 	defer C.free(unsafe.Pointer(cstr))
 
@@ -74,20 +71,20 @@ func newUnsafePipeline(synchronizer *Synchronizer, pipeline string) (*unsafePipe
 		sink:         (*C.GstAppSink)(unsafe.Pointer(sink)),
 		synchronizer: synchronizer,
 	}
-
-	p.eos.Lock()
-
-	if sink != nil {
-		// add an eos handler as well.
-		ceos := C.CString("eos")
-		defer C.free(unsafe.Pointer(ceos))
-
-		C.g_signal_connect_data(C.gpointer(unsafe.Pointer(sink)), ceos, C.GCallback(C.cgoEOSFunc), C.gpointer(pointer.Save(p)), nil, 0)
+	if write != nil {
+		writeConn, err := net.DialUDP("udp", nil, &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: *write})
+		if err != nil {
+			return nil, err
+		}
+		p.write = writeConn
 	}
 
 	runtime.SetFinalizer(p, func(pipeline *unsafePipeline) {
-		if err := pipeline.Close(); err != nil {
-			zap.L().Error("failed to close pipeline", zap.Error(err))
+		if C.gst_element_set_state(pipeline.element, C.GST_STATE_NULL) == C.GST_STATE_CHANGE_FAILURE {
+			zap.L().Error("failed to set pipeline to null")
+		}
+		if C.gst_bin_remove(pipeline.synchronizer.bin, p.element) == 0 {
+			zap.L().Error("failed to remove bin from pipeline")
 		}
 		if pipeline.source != nil {
 			C.gst_object_unref(C.gpointer(unsafe.Pointer(pipeline.source)))
@@ -95,14 +92,12 @@ func newUnsafePipeline(synchronizer *Synchronizer, pipeline string) (*unsafePipe
 		if pipeline.sink != nil {
 			C.gst_object_unref(C.gpointer(unsafe.Pointer(pipeline.sink)))
 		}
+		if err := pipeline.write.Close(); err != nil {
+			zap.L().Error("failed to close write connection", zap.Error(err))
+		}
 	})
 
 	return p, nil
-}
-
-//export goEOSFunc
-func goEOSFunc(object *C.GstElement, data unsafe.Pointer) {
-	pointer.Restore(data).(*unsafePipeline).eos.Unlock()
 }
 
 func (p *unsafePipeline) GetElement(name string) (*Element, error) {
@@ -115,7 +110,7 @@ func (p *unsafePipeline) GetElement(name string) (*Element, error) {
 	return &Element{gst: element}, nil
 }
 
-type Sample struct {
+type Buffer struct {
 	Data     []byte
 	PTS      *time.Duration
 	DTS      *time.Duration
@@ -124,7 +119,7 @@ type Sample struct {
 }
 
 func (p *unsafePipeline) Read(buf []byte) (int, error) {
-	buffer, err := p.ReadSample()
+	buffer, err := p.ReadBuffer()
 	if err != nil {
 		return 0, err
 	}
@@ -134,7 +129,9 @@ func (p *unsafePipeline) Read(buf []byte) (int, error) {
 	return copy(buf, buffer.Data), nil
 }
 
-func (p *unsafePipeline) ReadSample() (*Sample, error) {
+const GstClockTimeNone = math.MaxUint64
+
+func (p *unsafePipeline) ReadBuffer() (*Buffer, error) {
 	sample := C.gst_app_sink_pull_sample(p.sink)
 	if sample == nil {
 		return nil, io.EOF
@@ -154,20 +151,20 @@ func (p *unsafePipeline) ReadSample() (*Sample, error) {
 	defer C.free(unsafe.Pointer(copy))
 
 	var duration, pts, dts *time.Duration
-	if time.Duration(cbuf.duration) != C.GST_CLOCK_TIME_NONE {
+	if cbuf.duration != GstClockTimeNone {
 		d := (time.Duration(cbuf.duration) * time.Nanosecond)
 		duration = &d
 	}
-	if time.Duration(cbuf.pts) != C.GST_CLOCK_TIME_NONE {
+	if cbuf.pts != GstClockTimeNone {
 		p := (time.Duration(cbuf.pts) * time.Nanosecond)
 		pts = &p
 	}
-	if time.Duration(cbuf.dts) != C.GST_CLOCK_TIME_NONE {
+	if cbuf.dts != GstClockTimeNone {
 		d := (time.Duration(cbuf.dts) * time.Nanosecond)
 		dts = &d
 	}
 
-	return &Sample{
+	return &Buffer{
 		Data:     C.GoBytes(unsafe.Pointer(copy), C.int(size)),
 		Duration: duration,
 		PTS:      pts,
@@ -179,42 +176,18 @@ func (p *unsafePipeline) ReadSample() (*Sample, error) {
 func (p *unsafePipeline) ReadRTP() (*rtp.Packet, error) {
 	pkt := &rtp.Packet{}
 	buf := make([]byte, 1500)
-	if _, err := p.Read(buf); err != nil {
+	n, err := p.Read(buf)
+	if err != nil {
 		return nil, err
 	}
-	if err := pkt.Unmarshal(buf); err != nil {
+	if err := pkt.Unmarshal(buf[:n]); err != nil {
 		return nil, err
 	}
 	return pkt, nil
 }
 
 func (p *unsafePipeline) Write(buf []byte) (int, error) {
-	if err := p.WriteSample(&Sample{Data: buf}); err != nil {
-		return 0, err
-	}
-	return len(buf), nil
-}
-
-func (p *unsafePipeline) WriteSample(b *Sample) error {
-	cbuf := C.CBytes(b.Data)
-	defer C.free(cbuf)
-	cpbuf := C.g_memdup_compat(C.gconstpointer(cbuf), C.ulong(len(b.Data)))
-	gstbuf := C.gst_buffer_new_wrapped(cpbuf, C.ulong(len(b.Data)))
-
-	if b.PTS != nil {
-		gstbuf.pts = C.GstClockTime(b.PTS.Nanoseconds())
-	}
-	if b.DTS != nil {
-		gstbuf.dts = C.GstClockTime(b.DTS.Nanoseconds())
-	}
-	if b.Duration != nil {
-		gstbuf.duration = C.GstClockTime(b.Duration.Nanoseconds())
-	}
-
-	if C.gst_app_src_push_buffer(p.source, gstbuf) != C.GST_FLOW_OK {
-		return errors.New("failed to push buffer to source")
-	}
-	return nil
+	return p.write.Write(buf)
 }
 
 func (p *unsafePipeline) WriteRTP(pkt *rtp.Packet) error {
@@ -222,37 +195,21 @@ func (p *unsafePipeline) WriteRTP(pkt *rtp.Packet) error {
 	if err != nil {
 		return err
 	}
-	// TODO: does the PTS need to be set here? not sure, most depayloaders seem ok.
-	return p.WriteSample(&Sample{
-		Data: buf,
-	})
+	n, err := p.Write(buf)
+	if err != nil {
+		return err
+	}
+	if n != len(buf) {
+		return io.ErrShortWrite
+	}
+	return nil
 }
 
 func (p *unsafePipeline) Close() error {
-	if p.closed {
-		return nil
-	}
-	p.closed = true
-	if C.gst_element_set_state(p.element, C.GST_STATE_NULL) == C.GST_STATE_CHANGE_FAILURE {
-		return errors.New("failed to set element to NULL")
-	}
-	if C.gst_bin_remove(p.synchronizer.bin, p.element) == 0 {
-		return errors.New("failed to remove element from bin")
+	if p.source != nil {
+		if C.gst_element_send_event((*C.GstElement)(unsafe.Pointer(p.source)), C.gst_event_new_eos()) != C.int(1) {
+			return errors.New("failed to end stream")
+		}
 	}
 	return nil
-}
-
-func (p *unsafePipeline) SendEndOfStream() error {
-	if p.source == nil {
-		return errors.New("no source")
-	}
-	if C.gst_app_src_end_of_stream(p.source) != C.GST_FLOW_OK {
-		return errors.New("failed to end stream")
-	}
-	return nil
-}
-
-func (p *unsafePipeline) WaitForEndOfStream() {
-	p.eos.Lock()
-	defer p.eos.Unlock()
 }
