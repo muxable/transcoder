@@ -3,11 +3,11 @@ package server
 import (
 	"context"
 	"sync"
+	"time"
 
 	"github.com/muxable/transcoder/api"
 	"github.com/muxable/transcoder/internal/codecs"
 	"github.com/muxable/transcoder/internal/peerconnection"
-	"github.com/muxable/transcoder/internal/pipeline"
 	"github.com/pion/rtpio/pkg/rtpio"
 	"github.com/pion/webrtc/v3"
 	"go.uber.org/zap"
@@ -16,7 +16,6 @@ import (
 type Source struct {
 	*webrtc.PeerConnection
 	*webrtc.TrackRemote
-	*pipeline.Synchronizer
 }
 
 type TranscoderServer struct {
@@ -46,11 +45,6 @@ func (s *TranscoderServer) Signal(conn api.Transcoder_SignalServer) error {
 
 	signaller := peerconnection.Negotiate(peerConnection)
 
-	synchronizer, err := pipeline.NewSynchronizer()
-	if err != nil {
-		return err
-	}
-
 	peerConnection.OnTrack(func(tr *webrtc.TrackRemote, r *webrtc.RTPReceiver) {
 		go func() {
 			buf := make([]byte, 1500)
@@ -65,7 +59,6 @@ func (s *TranscoderServer) Signal(conn api.Transcoder_SignalServer) error {
 		s.sources = append(s.sources, &Source{
 			PeerConnection: peerConnection,
 			TrackRemote:    tr,
-			Synchronizer:   synchronizer,
 		})
 
 		s.onTrack.Broadcast()
@@ -120,12 +113,9 @@ func (s *TranscoderServer) Transcode(ctx context.Context, request *api.Transcode
 		s.onTrack.L.Unlock()
 	}
 
-	options := []TranscoderOption{WithSynchronizer(matched.Synchronizer)}
+	options := []TranscoderOption{}
 	if request.MimeType != "" {
 		options = append(options, ToOutputCodec(codecs.DefaultOutputCodecs[request.MimeType]))
-	}
-	if request.GstreamerPipeline != "" {
-		options = append(options, ViaGStreamerEncoder(request.GstreamerPipeline))
 	}
 
 	// tr is the remote track that matches the request.
@@ -133,6 +123,8 @@ func (s *TranscoderServer) Transcode(ctx context.Context, request *api.Transcode
 	if err != nil {
 		return nil, err
 	}
+	
+	time.Sleep(1 * time.Second)
 
 	tl, err := webrtc.NewTrackLocalStaticRTP(transcoder.OutputCodec().RTPCodecCapability, matched.TrackRemote.ID(), matched.TrackRemote.StreamID())
 	if err != nil {

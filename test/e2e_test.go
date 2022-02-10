@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/muxable/transcoder/internal/codecs"
-	"github.com/muxable/transcoder/internal/pipeline"
 	pkg_server "github.com/muxable/transcoder/pkg/server"
 	"github.com/pion/rtpio/pkg/rtpio"
 	"github.com/pion/webrtc/v3"

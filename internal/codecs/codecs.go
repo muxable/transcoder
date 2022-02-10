@@ -1,6 +1,7 @@
 package codecs
 
 import (
+	"github.com/muxable/rtptools/pkg/h265"
 	"github.com/pion/rtp"
 	"github.com/pion/rtp/codecs"
 	"github.com/pion/webrtc/v3"
@@ -175,15 +176,17 @@ var SupportedCodecs = map[string]GStreamerParameters{
 	},
 }
 
-var NativeDepayloader = map[string]rtp.Depacketizer {
+var NativeDepacketizer = map[string]rtp.Depacketizer{
 	webrtc.MimeTypeH264: &codecs.H264Packet{},
+	webrtc.MimeTypeH265: &h265.H265Packet{},
 	webrtc.MimeTypeVP8:  &codecs.VP8Packet{},
 	webrtc.MimeTypeVP9:  &codecs.VP9Packet{},
 	webrtc.MimeTypeOpus: &codecs.OpusPacket{},
 }
 
-var NativePayloader = map[string]rtp.Payloader {
+var NativePayloader = map[string]rtp.Payloader{
 	webrtc.MimeTypeH264: &codecs.H264Payloader{},
+	webrtc.MimeTypeH265: &h265.H265Payloader{},
 	webrtc.MimeTypeVP8:  &codecs.VP8Payloader{},
 	webrtc.MimeTypeVP9:  &codecs.VP9Payloader{},
 	webrtc.MimeTypeOpus: &codecs.OpusPayloader{},
