@@ -2,7 +2,6 @@ package ffmpeg
 
 import (
 	"fmt"
-	"log"
 	"net"
 	"strconv"
 	"strings"
@@ -65,7 +64,6 @@ func Send(tracks []*TrackLocal) (*sdp.SessionDescription, error) {
 		if err != nil {
 			return nil, err
 		}
-		log.Printf("dial %v", dial)
 		track.Writers = append(track.Writers, dial)
 	}
 	return s, nil
