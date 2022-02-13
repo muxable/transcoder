@@ -42,9 +42,16 @@ func NewTranscoder(from webrtc.RTPCodecParameters, to webrtc.RTPCodecCapability)
 	if err != nil {
 		return nil, err
 	}
-	port=23084
-	cmd := exec.Command("ffmpeg", "-loglevel", "info", "-protocol_whitelist", "rtp,udp,pipe", "-i", "pipe:0", "-bsf:v", "extract_extradata", "-c:v", "libx264",
-	"-f", "rtp", "-pkt_size", "1200", fmt.Sprintf("rtp://localhost:%d", port))
+	cmd := exec.Command("ffmpeg",
+		"-loglevel", "info",
+		"-protocol_whitelist", "rtp,udp,pipe",
+		"-i", "pipe:0",
+		"-c:v", "libx264",
+		"-preset", "ultrafast",
+		"-tune", "zerolatency",
+		"-f", "rtp",
+		"-pkt_size", "1200",
+		fmt.Sprintf("rtp://localhost:%d", port))
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return nil, err
@@ -113,6 +120,5 @@ func (t *Transcoder) ReadRTP() (*rtp.Packet, error) {
 }
 
 func (t *Transcoder) Close() error {
-	// return t.process.Kill()
-	return nil
+	return t.process.Kill()
 }
