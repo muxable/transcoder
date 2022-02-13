@@ -64,6 +64,7 @@ func Send(tracks []*TrackLocal) (*sdp.SessionDescription, error) {
 		if err != nil {
 			return nil, err
 		}
+		dial.SetWriteBuffer(50 * 1024 * 1024)
 		track.Writers = append(track.Writers, dial)
 	}
 	return s, nil

@@ -32,12 +32,12 @@ func Receive(desc *sdp.SessionDescription) ([]*TrackRemote, error) {
 		}
 
 		// listen on the connection information.
-		readCh := make(chan []byte)
+		readCh := make(chan []byte, 100)
 		conn, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4(0, 0, 0, 0), Port: media.MediaName.Port.Value})
 		if err != nil {
 			return nil, err
 		}
-		conn.SetReadBuffer(10 * 1024 * 1024)
+		conn.SetReadBuffer(50 * 1024 * 1024)
 		go func() {
 			for {
 				buf := make([]byte, 1500)
