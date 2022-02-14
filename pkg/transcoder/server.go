@@ -1,13 +1,12 @@
-package server
+package transcoder
 
 import (
 	"context"
+	"log"
 	"sync"
 
 	"github.com/muxable/transcoder/api"
-	"github.com/muxable/transcoder/internal/codecs"
 	"github.com/muxable/transcoder/internal/peerconnection"
-	"github.com/muxable/transcoder/internal/pipeline"
 	"github.com/pion/rtpio/pkg/rtpio"
 	"github.com/pion/webrtc/v3"
 	"go.uber.org/zap"
@@ -16,7 +15,7 @@ import (
 type Source struct {
 	*webrtc.PeerConnection
 	*webrtc.TrackRemote
-	*pipeline.Synchronizer
+	*Transcoder
 }
 
 type TranscoderServer struct {
@@ -46,7 +45,7 @@ func (s *TranscoderServer) Signal(conn api.Transcoder_SignalServer) error {
 
 	signaller := peerconnection.Negotiate(peerConnection)
 
-	synchronizer, err := pipeline.NewSynchronizer()
+	transcoder, err := NewTranscoder()
 	if err != nil {
 		return err
 	}
@@ -65,7 +64,7 @@ func (s *TranscoderServer) Signal(conn api.Transcoder_SignalServer) error {
 		s.sources = append(s.sources, &Source{
 			PeerConnection: peerConnection,
 			TrackRemote:    tr,
-			Synchronizer:   synchronizer,
+			Transcoder:   transcoder,
 		})
 
 		s.onTrack.Broadcast()
@@ -120,21 +119,20 @@ func (s *TranscoderServer) Transcode(ctx context.Context, request *api.Transcode
 		s.onTrack.L.Unlock()
 	}
 
-	options := []TranscoderOption{WithSynchronizer(matched.Synchronizer)}
-	if request.MimeType != "" {
-		options = append(options, ToOutputCodec(codecs.DefaultOutputCodecs[request.MimeType]))
-	}
-	if request.GstreamerPipeline != "" {
-		options = append(options, ViaGStreamerEncoder(request.GstreamerPipeline))
-	}
+	inCodec := matched.TrackRemote.Codec()
 
-	// tr is the remote track that matches the request.
-	transcoder, err := NewTranscoder(matched.TrackRemote.Codec(), options...)
+	log.Printf("input %v", inCodec)
+
+	builder, err := NewPipelineBuilder(inCodec.MimeType, request.MimeType, request.GstreamerPipeline)
 	if err != nil {
 		return nil, err
 	}
 
-	tl, err := webrtc.NewTrackLocalStaticRTP(transcoder.OutputCodec().RTPCodecCapability, matched.TrackRemote.ID(), matched.TrackRemote.StreamID())
+	if inCodec.MimeType == webrtc.MimeTypeH265 {
+		inCodec.SDPFmtpLine = "sprop-vps=QAEMAf//AWAAAAMAkAAAAwAAAwA/ugJA,sprop-sps=QgEBAWAAAAMAkAAAAwAAAwA/oAoIDxZbpKTC//AAEAAQEAAAAwAQAAADAeCA,sprop-pps=RAHAcYES"
+	}
+
+	pipeline, err := matched.Transcoder.NewReadWritePipeline(&inCodec, builder)
 	if err != nil {
 		return nil, err
 	}
@@ -143,14 +141,29 @@ func (s *TranscoderServer) Transcode(ctx context.Context, request *api.Transcode
 		for {
 			p, _, err := matched.TrackRemote.ReadRTP()
 			if err != nil {
+				zap.L().Error("failed to read rtp", zap.Error(err))
 				return
 			}
-			if err := transcoder.WriteRTP(p); err != nil {
+			if err := pipeline.WriteRTP(p); err != nil {
+				zap.L().Warn("failed to write rtp", zap.Error(err))
 				return
 			}
 		}
 	}()
-	go rtpio.CopyRTP(tl, transcoder)
+
+	outCodec, err := pipeline.Codec()
+	if err != nil {
+		return nil, err
+	}
+
+	log.Printf("negotiated %v", outCodec)
+
+	tl, err := webrtc.NewTrackLocalStaticRTP(outCodec.RTPCodecCapability, matched.TrackRemote.ID(), matched.TrackRemote.StreamID())
+	if err != nil {
+		return nil, err
+	}
+
+	go rtpio.CopyRTP(tl, pipeline)
 
 	rtpSender, err := matched.PeerConnection.AddTrack(tl)
 	if err != nil {

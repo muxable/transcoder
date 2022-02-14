@@ -1,5 +1,5 @@
-#ifndef SYNCHRONIZER_H
-#define SYNCHRONIZER_H
+#ifndef TRANSCODER_H
+#define TRANSCODER_H
 
 #include <glib.h>
 #include <gst/gst.h>

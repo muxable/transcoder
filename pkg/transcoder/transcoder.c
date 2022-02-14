@@ -1,4 +1,4 @@
-#include "synchronizer.h"
+#include "transcoder.h"
 
 #include <glib.h>
 #include <gst/gst.h>

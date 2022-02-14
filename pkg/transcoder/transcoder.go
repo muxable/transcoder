@@ -1,4 +1,4 @@
-package pipeline
+package transcoder
 
 /*
 #cgo pkg-config: gstreamer-1.0 gstreamer-app-1.0
@@ -7,14 +7,14 @@ package pipeline
 #include <gst/app/gstappsrc.h>
 #include <gst/gst.h>
 
-#include "synchronizer.h"
+#include "transcoder.h"
 */
 import "C"
 import (
 	"errors"
 	"fmt"
 	"io"
-	"net"
+	"log"
 	"runtime"
 	"time"
 	"unsafe"
@@ -22,6 +22,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/mattn/go-pointer"
 	"github.com/pion/rtpio/pkg/rtpio"
+	"github.com/pion/webrtc/v3"
 	"go.uber.org/zap"
 )
 
@@ -29,7 +30,7 @@ func init() {
 	C.gst_init(nil, nil)
 }
 
-type Synchronizer struct {
+type Transcoder struct {
 	id   uuid.UUID
 	bin  *C.GstBin
 	ctx  *C.GMainContext
@@ -38,7 +39,7 @@ type Synchronizer struct {
 	closed bool
 }
 
-func NewSynchronizer() (*Synchronizer, error) {
+func NewTranscoder() (*Transcoder, error) {
 	id := uuid.New()
 
 	cname := C.CString(id.String())
@@ -53,7 +54,7 @@ func NewSynchronizer() (*Synchronizer, error) {
 	loop := C.g_main_loop_new(ctx, C.int(0))
 	watch := C.gst_bus_create_watch(C.gst_pipeline_get_bus((*C.GstPipeline)(unsafe.Pointer(pipeline))))
 
-	s := &Synchronizer{
+	s := &Transcoder{
 		id:   id,
 		bin:  (*C.GstBin)(unsafe.Pointer(pipeline)),
 		ctx:  ctx,
@@ -69,7 +70,7 @@ func NewSynchronizer() (*Synchronizer, error) {
 
 	go C.g_main_loop_run(loop)
 
-	runtime.SetFinalizer(s, func(synchronizer *Synchronizer) {
+	runtime.SetFinalizer(s, func(synchronizer *Transcoder) {
 		if err := synchronizer.Close(); err != nil {
 			zap.L().Error("failed to close synchronizer", zap.Error(err))
 		}
@@ -81,7 +82,7 @@ func NewSynchronizer() (*Synchronizer, error) {
 	return s, nil
 }
 
-func (s *Synchronizer) Close() error {
+func (s *Transcoder) Close() error {
 	if s.closed {
 		return nil
 	}
@@ -95,7 +96,7 @@ func (s *Synchronizer) Close() error {
 
 //export goBusFunc
 func goBusFunc(bus *C.GstBus, msg *C.GstMessage, ptr C.gpointer) C.gboolean {
-	s := pointer.Restore(unsafe.Pointer(ptr)).(*Synchronizer)
+	s := pointer.Restore(unsafe.Pointer(ptr)).(*Transcoder)
 	switch msg._type {
 	case C.GST_MESSAGE_ERROR:
 		var gerr *C.GError
@@ -146,22 +147,16 @@ func goBusFunc(bus *C.GstBus, msg *C.GstMessage, ptr C.gpointer) C.gboolean {
 	return C.gboolean(1)
 }
 
-type Pipeline interface {
-	GetElement(name string) (*Element, error)
-}
-
 type ReadOnlyPipeline interface {
-	Pipeline
 	io.Reader
 	rtpio.RTPReader
-	ReadBuffer() (*Buffer, error)
+	Codec() (*webrtc.RTPCodecParameters, error)
+	SSRC() (webrtc.SSRC, error)
 }
 
 type WriteOnlyPipeline interface {
-	Pipeline
 	io.WriteCloser
 	rtpio.RTPWriteCloser
-	// WriteBuffer(*Buffer) error
 }
 
 type ReadWritePipeline interface {
@@ -169,36 +164,23 @@ type ReadWritePipeline interface {
 	WriteOnlyPipeline
 }
 
-func unusedPort() (int, error) {
-	// get an unused udp port.
-	conn, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 0})
-	if err != nil {
-		return 0, err
-	}
-	defer conn.Close()
-	return conn.LocalAddr().(*net.UDPAddr).Port, nil
+func (s *Transcoder) NewReadOnlyPipeline(str string) (ReadOnlyPipeline, error) {
+	return s.newUnsafePipeline(fmt.Sprintf("%s ! queue ! appsink name=internal-sink sync=false async=false", str))
 }
 
-func (s *Synchronizer) NewPipeline(str string) (Pipeline, error) {
-	return newUnsafePipeline(s, str, nil)
-}
-
-func (s *Synchronizer) NewReadOnlyPipeline(str string) (ReadOnlyPipeline, error) {
-	return newUnsafePipeline(s, fmt.Sprintf("%s ! queue ! appsink name=internal-sink sync=false async=false", str), nil)
-}
-
-func (s *Synchronizer) NewWriteOnlyPipeline(str string) (WriteOnlyPipeline, error) {
-	writePort, err := unusedPort()
+func (s *Transcoder) NewWriteOnlyPipeline(in *webrtc.RTPCodecParameters, str string) (WriteOnlyPipeline, error) {
+	inCaps, err := CapsFromRTPCodecParameters(in)
 	if err != nil {
 		return nil, err
 	}
-	return newUnsafePipeline(s, fmt.Sprintf("udpsrc address=127.0.0.1 port=%d name=internal-source ! queue ! %s", writePort, str), &writePort)
+	return s.newUnsafePipeline(fmt.Sprintf("appsrc format=time name=internal-source ! %s ! queue ! %s", inCaps.String(), str))
 }
 
-func (s *Synchronizer) NewReadWritePipeline(str string) (ReadWritePipeline, error) {
-	writePort, err := unusedPort()
+func (s *Transcoder) NewReadWritePipeline(in *webrtc.RTPCodecParameters, str string) (ReadWritePipeline, error) {
+	inCaps, err := CapsFromRTPCodecParameters(in)
 	if err != nil {
 		return nil, err
 	}
-	return newUnsafePipeline(s, fmt.Sprintf("udpsrc address=127.0.0.1 port=%d name=internal-source ! queue ! %s ! queue ! appsink name=internal-sink sync=false async=false", writePort, str), &writePort)
+	log.Printf("%v", str)
+	return s.newUnsafePipeline(fmt.Sprintf("appsrc format=time name=internal-source ! %s ! queue ! %s ! queue ! appsink name=internal-sink sync=false async=false", inCaps.String(), str))
 }

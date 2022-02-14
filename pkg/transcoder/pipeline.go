@@ -1,4 +1,4 @@
-package pipeline
+package transcoder
 
 /*
 #cgo pkg-config: gstreamer-1.0 gstreamer-app-1.0
@@ -14,26 +14,30 @@ import (
 	"errors"
 	"io"
 	"log"
-	"math"
-	"net"
 	"runtime"
 	"time"
 	"unsafe"
 
 	"github.com/pion/rtp"
+	"github.com/pion/webrtc/v3"
 	"go.uber.org/zap"
 )
 
+var (
+	csink = C.CString("sink")
+)
+
 type unsafePipeline struct {
-	element      *C.GstElement
-	synchronizer *Synchronizer
+	element    *C.GstElement
+	transcoder *Transcoder
 
 	source *C.GstAppSrc
 	sink   *C.GstAppSink
-	write  *net.UDPConn
 }
 
-func newUnsafePipeline(synchronizer *Synchronizer, pipeline string, write *int) (*unsafePipeline, error) {
+func (t *Transcoder) newUnsafePipeline(pipeline string) (*unsafePipeline, error) {
+	log.Printf("%v", pipeline)
+
 	cstr := C.CString(pipeline)
 	defer C.free(unsafe.Pointer(cstr))
 
@@ -46,7 +50,7 @@ func newUnsafePipeline(synchronizer *Synchronizer, pipeline string, write *int) 
 		return nil, errors.New(errMsg)
 	}
 
-	if C.gst_bin_add(synchronizer.bin, element) == 0 {
+	if C.gst_bin_add(t.bin, element) == 0 {
 		return nil, errors.New("failed to add bin to pipeline")
 	}
 
@@ -67,24 +71,17 @@ func newUnsafePipeline(synchronizer *Synchronizer, pipeline string, write *int) 
 	sink := C.gst_bin_get_by_name(bin, csink)
 
 	p := &unsafePipeline{
-		element:      element,
-		source:       (*C.GstAppSrc)(unsafe.Pointer(source)),
-		sink:         (*C.GstAppSink)(unsafe.Pointer(sink)),
-		synchronizer: synchronizer,
-	}
-	if write != nil {
-		writeConn, err := net.DialUDP("udp", nil, &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: *write})
-		if err != nil {
-			return nil, err
-		}
-		p.write = writeConn
+		element:    element,
+		source:     (*C.GstAppSrc)(unsafe.Pointer(source)),
+		sink:       (*C.GstAppSink)(unsafe.Pointer(sink)),
+		transcoder: t,
 	}
 
 	runtime.SetFinalizer(p, func(pipeline *unsafePipeline) {
 		if C.gst_element_set_state(pipeline.element, C.GST_STATE_NULL) == C.GST_STATE_CHANGE_FAILURE {
 			zap.L().Error("failed to set pipeline to null")
 		}
-		if C.gst_bin_remove(pipeline.synchronizer.bin, p.element) == 0 {
+		if C.gst_bin_remove(pipeline.transcoder.bin, pipeline.element) == 0 {
 			zap.L().Error("failed to remove bin from pipeline")
 		}
 		if pipeline.source != nil {
@@ -93,85 +90,68 @@ func newUnsafePipeline(synchronizer *Synchronizer, pipeline string, write *int) 
 		if pipeline.sink != nil {
 			C.gst_object_unref(C.gpointer(unsafe.Pointer(pipeline.sink)))
 		}
-		if err := pipeline.write.Close(); err != nil {
-			zap.L().Error("failed to close write connection", zap.Error(err))
-		}
 	})
 
 	return p, nil
 }
 
-func (p *unsafePipeline) GetElement(name string) (*Element, error) {
-	cstr := C.CString(name)
-	defer C.free(unsafe.Pointer(cstr))
-	element := C.gst_bin_get_by_name((*C.GstBin)(unsafe.Pointer(p.element)), cstr)
-	if element == nil {
-		return nil, errors.New("failed to get element")
+func (p *unsafePipeline) sinkCaps() (*Caps, error) {
+	pad := C.gst_element_get_static_pad((*C.GstElement)(unsafe.Pointer(p.sink)), csink)
+	if pad == nil {
+		return nil, errors.New("failed to get src pad")
 	}
-	return &Element{gst: element}, nil
+	defer C.gst_object_unref(C.gpointer(pad))
+	
+	for {
+		c := C.gst_pad_get_current_caps(pad)
+		if c == nil {
+			time.Sleep(1000 * time.Millisecond) // it would be nice to not poll for this.
+			log.Printf("waiting for caps")
+			continue
+		}
+		return &Caps{caps: c}, nil
+	}
 }
 
-type Buffer struct {
-	Data     []byte
-	PTS      *time.Duration
-	DTS      *time.Duration
-	Duration *time.Duration
-	Offset   int
+func (p *unsafePipeline) Codec() (*webrtc.RTPCodecParameters, error) {
+	caps, err := p.sinkCaps()
+	if err != nil {
+		return nil, err
+	}
+	return caps.RTPCodecParameters()
 }
 
-func (p *unsafePipeline) Read(buf []byte) (int, error) {
-	buffer, err := p.ReadBuffer()
+func (p *unsafePipeline) SSRC() (webrtc.SSRC, error) {
+	caps, err := p.sinkCaps()
 	if err != nil {
 		return 0, err
 	}
-	if len(buffer.Data) > len(buf) {
-		return 0, io.ErrShortBuffer
-	}
-	return copy(buf, buffer.Data), nil
+	return caps.SSRC()
 }
 
-const GstClockTimeNone = math.MaxUint64
-
-func (p *unsafePipeline) ReadBuffer() (*Buffer, error) {
+func (p *unsafePipeline) Read(buf []byte) (int, error) {
 	sample := C.gst_app_sink_pull_sample(p.sink)
 	if sample == nil {
-		return nil, io.EOF
+		return 0, io.EOF
 	}
 	defer C.gst_sample_unref(sample)
 
 	cbuf := C.gst_sample_get_buffer(sample)
 	if cbuf == nil {
-		return nil, io.ErrUnexpectedEOF
+		return 0, io.ErrUnexpectedEOF
 	}
 
-	var copy C.gpointer
+	var c C.gpointer
 	var size C.ulong
 
-	C.gst_buffer_extract_dup(cbuf, C.ulong(0), C.gst_buffer_get_size(cbuf), &copy, &size)
+	C.gst_buffer_extract_dup(cbuf, C.ulong(0), C.gst_buffer_get_size(cbuf), &c, &size)
+	defer C.free(unsafe.Pointer(c))
 
-	defer C.free(unsafe.Pointer(copy))
-
-	var duration, pts, dts *time.Duration
-	if cbuf.duration != GstClockTimeNone {
-		d := (time.Duration(cbuf.duration) * time.Nanosecond)
-		duration = &d
+	data := C.GoBytes(unsafe.Pointer(c), C.int(size))
+	if len(data) > len(buf) {
+		return 0, io.ErrShortBuffer
 	}
-	if cbuf.pts != GstClockTimeNone {
-		p := (time.Duration(cbuf.pts) * time.Nanosecond)
-		pts = &p
-	}
-	if cbuf.dts != GstClockTimeNone {
-		d := (time.Duration(cbuf.dts) * time.Nanosecond)
-		dts = &d
-	}
-
-	return &Buffer{
-		Data:     C.GoBytes(unsafe.Pointer(copy), C.int(size)),
-		Duration: duration,
-		PTS:      pts,
-		DTS:      dts,
-		Offset:   int(cbuf.offset),
-	}, nil
+	return copy(buf, data), nil
 }
 
 func (p *unsafePipeline) ReadRTP() (*rtp.Packet, error) {
@@ -184,12 +164,22 @@ func (p *unsafePipeline) ReadRTP() (*rtp.Packet, error) {
 	if err := pkt.Unmarshal(buf[:n]); err != nil {
 		return nil, err
 	}
-	log.Printf("%v %v", pkt.SequenceNumber, pkt.MarshalSize())
 	return pkt, nil
 }
 
 func (p *unsafePipeline) Write(buf []byte) (int, error) {
-	return p.write.Write(buf)
+	b := C.CBytes(buf)
+	defer C.free(b)
+
+	ptr := C.g_memdup_compat(C.gconstpointer(b), C.ulong(len(buf)))
+	data := C.gst_buffer_new_wrapped(ptr, C.ulong(len(buf)))
+
+	gstReturn := C.gst_app_src_push_buffer(p.source, data)
+
+	if gstReturn != C.GST_FLOW_OK {
+		return 0, errors.New("could not push buffer on appsrc element")
+	}
+	return len(buf), nil
 }
 
 func (p *unsafePipeline) WriteRTP(pkt *rtp.Packet) error {

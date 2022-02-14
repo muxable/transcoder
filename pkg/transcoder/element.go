@@ -1,4 +1,4 @@
-package pipeline
+package transcoder
 
 /*
 #cgo pkg-config: gstreamer-1.0 gstreamer-app-1.0
