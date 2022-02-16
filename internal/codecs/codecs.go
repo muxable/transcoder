@@ -131,7 +131,7 @@ type GStreamerParameters struct {
 
 var SupportedCodecs = map[string]GStreamerParameters{
 	webrtc.MimeTypeH264: {
-		"rtph264depay", "x264enc speed-preset=ultrafast tune=zerolatency key-int-max=20", "rtph264pay",
+		"rtph264depay", "video/x-raw,format=I420 ! x264enc speed-preset=ultrafast tune=zerolatency key-int-max=20 ! video/x-h264,stream-format=byte-stream", "rtph264pay",
 	},
 	webrtc.MimeTypeH265: {
 		"rtph265depay", "x265enc speed-preset=ultrafast tune=zerolatency key-int-max=20", "rtph265pay",

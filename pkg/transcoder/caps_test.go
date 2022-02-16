@@ -55,7 +55,7 @@ func TestCaps_ToCaps(t *testing.T) {
 	defer undo()
 
 	defer goleak.VerifyNone(t)
-	
+
 	for _, tt := range flagtests {
 		t.Run(tt.caps, func(t *testing.T) {
 			caps, err := CapsFromRTPCodecParameters(tt.codec)

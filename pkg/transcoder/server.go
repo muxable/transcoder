@@ -7,6 +7,7 @@ import (
 
 	"github.com/muxable/transcoder/api"
 	"github.com/muxable/transcoder/internal/peerconnection"
+	"github.com/pion/rtcp"
 	"github.com/pion/rtpio/pkg/rtpio"
 	"github.com/pion/webrtc/v3"
 	"go.uber.org/zap"
@@ -64,7 +65,7 @@ func (s *TranscoderServer) Signal(conn api.Transcoder_SignalServer) error {
 		s.sources = append(s.sources, &Source{
 			PeerConnection: peerConnection,
 			TrackRemote:    tr,
-			Transcoder:   transcoder,
+			Transcoder:     transcoder,
 		})
 
 		s.onTrack.Broadcast()
@@ -150,6 +151,12 @@ func (s *TranscoderServer) Transcode(ctx context.Context, request *api.Transcode
 			}
 		}
 	}()
+
+	pipeline.OnUpstreamForceKeyUnit(func() {
+		if err := matched.PeerConnection.WriteRTCP([]rtcp.Packet{&rtcp.PictureLossIndication{MediaSSRC: uint32(matched.TrackRemote.SSRC())}}); err != nil {
+			zap.L().Warn("failed to write rtcp", zap.Error(err))
+		}
+	})
 
 	outCodec, err := pipeline.Codec()
 	if err != nil {

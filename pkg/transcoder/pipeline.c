@@ -11,3 +11,13 @@ gpointer g_memdup_compat(gconstpointer ptr, gsize size)
     return g_memdup(ptr, size);
 #endif
 }
+
+gboolean cgoSourcePadEventFunc(GstPad *pad, GstObject *parent, GstEvent *event)
+{
+    return goSourcePadEventFunc(pad, parent, event);
+}
+
+gboolean cgoSinkPadEventFunc(GstPad *pad, GstObject *parent, GstEvent *event)
+{
+    return goSinkPadEventFunc(pad, parent, event);
+}

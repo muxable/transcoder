@@ -4,6 +4,7 @@ import (
 	"io"
 	"testing"
 
+	"github.com/pion/rtp"
 	"github.com/pion/rtpio/pkg/rtpio"
 	"github.com/pion/webrtc/v3"
 	"go.uber.org/goleak"
@@ -31,41 +32,44 @@ func TestPipeline_Empty(t *testing.T) {
 	}
 	defer p.Close()
 
-	buf1 := []byte("test")
-	buf2 := []byte("moo")
-	buf3 := []byte("cows")
+	buf1 := &rtp.Packet{Header: rtp.Header{Version: 2, SequenceNumber: 1}}
+	buf2 := &rtp.Packet{Header: rtp.Header{Version: 2, SequenceNumber: 2}}
+	buf3 := &rtp.Packet{Header: rtp.Header{Version: 2, SequenceNumber: 3}}
 
 	// write some data and read some data.
-	if _, err := p.Write(buf1); err != nil {
+	if err := p.WriteRTP(buf1); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := p.Write(buf2); err != nil {
+	if err := p.WriteRTP(buf2); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := p.Write(buf3); err != nil {
+	if err := p.WriteRTP(buf3); err != nil {
 		t.Fatal(err)
 	}
 
 	// read the data back
-	got1 := make([]byte, len(buf1))
-	if _, err := p.Read(got1); err != nil {
+	got1, err := p.ReadRTP()
+	if err != nil {
 		t.Fatal(err)
 	}
-	if string(got1) != string(buf1) {
-		t.Fatalf("got %s, want %s", got1, buf1)
+	if got1.SequenceNumber != 1 {
+		t.Fatalf("got %d, want 1", got1.SequenceNumber)
 	}
 
-	got2 := make([]byte, len(buf2))
-	if _, err := p.Read(got2); err != nil {
+	got2, err := p.ReadRTP()
+	if err != nil {
 		t.Fatal(err)
 	}
-	if string(got2) != string(buf2) {
-		t.Fatalf("got %s, want %s", got2, buf2)
+	if got2.SequenceNumber != 2 {
+		t.Fatalf("got %d, want 2", got2.SequenceNumber)
 	}
 
-	got3 := make([]byte, len(buf3))
-	if _, err := p.Read(got3); err != nil {
+	got3, err := p.ReadRTP()
+	if err != nil {
 		t.Fatal(err)
+	}
+	if got3.SequenceNumber != 3 {
+		t.Fatalf("got %d, want 3", got3.SequenceNumber)
 	}
 }
 

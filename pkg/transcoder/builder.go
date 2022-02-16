@@ -41,9 +41,9 @@ func NewPipelineBuilder(from, to string, via string) (string, error) {
 	// construct the conversion pipeline
 
 	if strings.HasPrefix(from, "video") {
-		elements = append(elements, "decodebin ! queue ! videoconvert ! videorate ! queue", via)
+		elements = append(elements, "vp8dec ! queue ! videoconvert ! queue", via)
 	} else if strings.HasPrefix(from, "audio") {
-		elements = append(elements, "decodebin ! queue ! audioconvert ! audioresample ! queue", via)
+		elements = append(elements, "decodebin ! queue ! audioconvert ! queue", via)
 	}
 
 	elements = append(elements, outputParams.Payloader)

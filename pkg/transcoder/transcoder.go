@@ -13,7 +13,6 @@ import "C"
 import (
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"runtime"
 	"time"
@@ -148,15 +147,14 @@ func goBusFunc(bus *C.GstBus, msg *C.GstMessage, ptr C.gpointer) C.gboolean {
 }
 
 type ReadOnlyPipeline interface {
-	io.Reader
 	rtpio.RTPReader
 	Codec() (*webrtc.RTPCodecParameters, error)
 	SSRC() (webrtc.SSRC, error)
 }
 
 type WriteOnlyPipeline interface {
-	io.WriteCloser
 	rtpio.RTPWriteCloser
+	OnUpstreamForceKeyUnit(func())
 }
 
 type ReadWritePipeline interface {
@@ -165,7 +163,7 @@ type ReadWritePipeline interface {
 }
 
 func (s *Transcoder) NewReadOnlyPipeline(str string) (ReadOnlyPipeline, error) {
-	return s.newUnsafePipeline(fmt.Sprintf("%s ! queue ! appsink name=internal-sink sync=false async=false", str))
+	return s.newUnsafePipeline(fmt.Sprintf("%s ! queue ! appsink name=internal-sink sync=false async=false", str), 0)
 }
 
 func (s *Transcoder) NewWriteOnlyPipeline(in *webrtc.RTPCodecParameters, str string) (WriteOnlyPipeline, error) {
@@ -173,7 +171,7 @@ func (s *Transcoder) NewWriteOnlyPipeline(in *webrtc.RTPCodecParameters, str str
 	if err != nil {
 		return nil, err
 	}
-	return s.newUnsafePipeline(fmt.Sprintf("appsrc format=time name=internal-source ! %s ! queue ! %s", inCaps.String(), str))
+	return s.newUnsafePipeline(fmt.Sprintf("appsrc format=time name=internal-source ! %s ! queue ! %s", inCaps.String(), str), in.ClockRate)
 }
 
 func (s *Transcoder) NewReadWritePipeline(in *webrtc.RTPCodecParameters, str string) (ReadWritePipeline, error) {
@@ -182,5 +180,5 @@ func (s *Transcoder) NewReadWritePipeline(in *webrtc.RTPCodecParameters, str str
 		return nil, err
 	}
 	log.Printf("%v", str)
-	return s.newUnsafePipeline(fmt.Sprintf("appsrc format=time name=internal-source ! %s ! queue ! %s ! queue ! appsink name=internal-sink sync=false async=false", inCaps.String(), str))
+	return s.newUnsafePipeline(fmt.Sprintf("appsrc format=time name=internal-source ! %s ! queue ! %s ! queue ! appsink name=internal-sink sync=false async=false", inCaps.String(), str), in.ClockRate)
 }
