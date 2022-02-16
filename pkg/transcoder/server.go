@@ -120,19 +120,12 @@ func (s *TranscoderServer) Transcode(ctx context.Context, request *api.Transcode
 		s.onTrack.L.Unlock()
 	}
 
-	inCodec := matched.TrackRemote.Codec()
-
-	log.Printf("input %v", inCodec)
-
-	builder, err := NewPipelineBuilder(inCodec.MimeType, request.MimeType, request.GstreamerPipeline)
+	builder, err := NewPipelineBuilder(matched.TrackRemote.Kind(), request.MimeType, request.GstreamerPipeline)
 	if err != nil {
 		return nil, err
 	}
 
-	if inCodec.MimeType == webrtc.MimeTypeH265 {
-		inCodec.SDPFmtpLine = "sprop-vps=QAEMAf//AWAAAAMAkAAAAwAAAwA/ugJA,sprop-sps=QgEBAWAAAAMAkAAAAwAAAwA/oAoIDxZbpKTC//AAEAAQEAAAAwAQAAADAeCA,sprop-pps=RAHAcYES"
-	}
-
+	inCodec := matched.TrackRemote.Codec()
 	pipeline, err := matched.Transcoder.NewReadWritePipeline(&inCodec, builder)
 	if err != nil {
 		return nil, err

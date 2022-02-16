@@ -126,21 +126,21 @@ var DefaultOutputCodecs = map[string]webrtc.RTPCodecParameters{
 }
 
 type GStreamerParameters struct {
-	Depayloader, DefaultEncoder, Payloader string
+	DefaultEncoder, Payloader string
 }
 
 var SupportedCodecs = map[string]GStreamerParameters{
 	webrtc.MimeTypeH264: {
-		"rtph264depay", "video/x-raw,format=I420 ! x264enc speed-preset=ultrafast tune=zerolatency key-int-max=20 ! video/x-h264,stream-format=byte-stream", "rtph264pay",
+		"video/x-raw,format=I420 ! x264enc speed-preset=ultrafast tune=zerolatency key-int-max=20 ! video/x-h264,stream-format=byte-stream", "rtph264pay",
 	},
 	webrtc.MimeTypeH265: {
-		"rtph265depay", "x265enc speed-preset=ultrafast tune=zerolatency key-int-max=20", "rtph265pay",
+		"x265enc speed-preset=ultrafast tune=zerolatency key-int-max=20", "rtph265pay",
 	},
 	webrtc.MimeTypeVP8: {
-		"rtpvp8depay", "vp8enc end-usage=cq error-resilient=partitions keyframe-max-dist=10 auto-alt-ref=true cpu-used=5", "rtpvp8pay",
+		"vp8enc end-usage=cq error-resilient=partitions keyframe-max-dist=10 auto-alt-ref=true cpu-used=5", "rtpvp8pay",
 	},
 	webrtc.MimeTypeVP9: {
-		"rtpvp9depay", "vp9enc end-usage=cq error-resilient=partitions keyframe-max-dist=10 auto-alt-ref=true cpu-used=5", "rtpvp9pay",
+		"vp9enc end-usage=cq error-resilient=partitions keyframe-max-dist=10 auto-alt-ref=true cpu-used=5", "rtpvp9pay",
 	},
 	// webrtc.MimeTypeAV1: {
 	// 	"rtpav1depay", "av1enc deadline=1", "rtpav1pay",
@@ -149,11 +149,11 @@ var SupportedCodecs = map[string]GStreamerParameters{
 	// 	},
 	// },
 
-	webrtc.MimeTypeOpus: {"rtpopusdepay", "opusenc inband-fec=true", "rtpopuspay"},
-	"audio/AAC":         {"rtpmp4adepay", "avenc_aac", "rtpmp4apay"},
-	"audio/SPEEX":       {"rtpspeexdepay", "speexenc", "rtpspeexpay"},
-	webrtc.MimeTypeG722: {"rtpg722depay", "avenc_g722", "rtpg722pay"},
-	webrtc.MimeTypePCMA: {"rtppcmadepay", "alawenc", "rtppcmapay"},
-	webrtc.MimeTypePCMU: {"rtppcmudepay", "mulawenc", "rtppcmupay"},
-	"audio/AC3":         {"rtpac3depay", "avenc_ac3", "rtpac3pay"},
+	webrtc.MimeTypeOpus: {"opusenc inband-fec=true", "rtpopuspay"},
+	"audio/AAC":         {"avenc_aac", "rtpmp4apay"},
+	"audio/SPEEX":       {"speexenc", "rtpspeexpay"},
+	webrtc.MimeTypeG722: {"avenc_g722", "rtpg722pay"},
+	webrtc.MimeTypePCMA: {"alawenc", "rtppcmapay"},
+	webrtc.MimeTypePCMU: {"mulawenc", "rtppcmupay"},
+	"audio/AC3":         {"avenc_ac3", "rtpac3pay"},
 }

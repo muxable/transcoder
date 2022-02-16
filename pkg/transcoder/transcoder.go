@@ -13,7 +13,6 @@ import "C"
 import (
 	"errors"
 	"fmt"
-	"log"
 	"runtime"
 	"time"
 	"unsafe"
@@ -179,6 +178,5 @@ func (s *Transcoder) NewReadWritePipeline(in *webrtc.RTPCodecParameters, str str
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("%v", str)
 	return s.newUnsafePipeline(fmt.Sprintf("appsrc format=time name=internal-source ! %s ! queue ! %s ! queue ! appsink name=internal-sink sync=false async=false", inCaps.String(), str), in.ClockRate)
 }
