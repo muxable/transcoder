@@ -104,7 +104,7 @@ var DefaultOutputCodecs = map[string]webrtc.RTPCodecParameters{
 	},
 
 	webrtc.MimeTypeOpus: {
-		RTPCodecCapability: webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeOpus, ClockRate: 48000, Channels: 2},
+		RTPCodecCapability: webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeOpus, ClockRate: 48000, Channels: 2, SDPFmtpLine: "minptime=10;useinbandfec=1"},
 		PayloadType:        111,
 	},
 	"audio/AC3": {
