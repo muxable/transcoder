@@ -147,7 +147,7 @@ func goSinkPadEventFunc(pad *C.GstPad, obj *C.GstObject, event *C.GstEvent) C.gb
 		sink := (*C.GstElement)(unsafe.Pointer(obj))
 		if p := sinkmap[sink]; p != nil {
 			delete(sinkmap, sink)
-			time.Sleep(10 * time.Millisecond)  // gstreamer sends two caps payloads. we typically want the second, but who knows...
+			time.Sleep(10 * time.Millisecond) // gstreamer sends two caps payloads. we typically want the second, but who knows...
 			p.capsNegotiated.Done()
 		} else {
 			zap.L().Warn("got caps event with nil pipeline")
