@@ -4,9 +4,8 @@ go 1.17
 
 require (
 	github.com/blendle/zapdriver v1.3.1
-	github.com/mattn/go-pointer v0.0.1
+	github.com/muxable/rtptools v0.1.6
 	github.com/pion/rtpio v0.1.4
-	go.uber.org/goleak v1.1.12
 	google.golang.org/grpc v1.43.0
 	google.golang.org/protobuf v1.27.1
 )
@@ -23,11 +22,11 @@ require (
 )
 
 require (
-	github.com/google/uuid v1.3.0
+	github.com/google/uuid v1.3.0 // indirect
 	github.com/pion/datachannel v1.5.2 // indirect
 	github.com/pion/dtls/v2 v2.1.0 // indirect
-	github.com/pion/ice/v2 v2.1.18 // indirect
-	github.com/pion/interceptor v0.1.6
+	github.com/pion/ice/v2 v2.1.19 // indirect
+	github.com/pion/interceptor v0.1.7
 	github.com/pion/logging v0.2.2 // indirect
 	github.com/pion/mdns v0.0.5 // indirect
 	github.com/pion/randutil v0.1.0 // indirect
@@ -42,8 +41,8 @@ require (
 	github.com/pion/udp v0.1.1 // indirect
 	github.com/pion/webrtc/v3 v3.1.17
 	go.uber.org/zap v1.20.0
-	golang.org/x/crypto v0.0.0-20220112180741-5e0467b6c7ce // indirect
-	golang.org/x/net v0.0.0-20220114011407-0dd24b26b47d // indirect
-	golang.org/x/sys v0.0.0-20220114195835-da31bd327af9 // indirect
+	golang.org/x/crypto v0.0.0-20220128200615-198e4374d7ed // indirect
+	golang.org/x/net v0.0.0-20220127200216-cd36cc0744dd // indirect
+	golang.org/x/sys v0.0.0-20220128215802-99c3d69c2c27 // indirect
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 )

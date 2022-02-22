@@ -23,8 +23,6 @@ message TranscodeRequest {
   string rtp_stream_id = 3;
   
   string mime_type = 4;
-  // gstreamer_pipeline must be compatible with mime_type, however is optional.
-  string gstreamer_pipeline = 5;
 }
 
 message TranscodeResponse {

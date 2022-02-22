@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"sync"
+	"time"
 
 	"github.com/muxable/transcoder/api"
 	"github.com/muxable/transcoder/internal/peerconnection"
@@ -124,6 +125,8 @@ func (s *TranscoderServer) Transcode(ctx context.Context, request *api.Transcode
 	if err != nil {
 		return nil, err
 	}
+
+	time.Sleep(1 * time.Second)
 
 	inCodec := matched.TrackRemote.Codec()
 	pipeline, err := matched.Transcoder.NewReadWritePipeline(&inCodec, builder)
