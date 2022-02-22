@@ -1,9 +1,6 @@
 package codecs
 
 import (
-	"github.com/muxable/rtptools/pkg/h265"
-	"github.com/pion/rtp"
-	"github.com/pion/rtp/codecs"
 	"github.com/pion/webrtc/v3"
 )
 
@@ -107,7 +104,7 @@ var DefaultOutputCodecs = map[string]webrtc.RTPCodecParameters{
 	},
 
 	webrtc.MimeTypeOpus: {
-		RTPCodecCapability: webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeOpus, ClockRate: 48000, Channels: 2},
+		RTPCodecCapability: webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeOpus, ClockRate: 48000, Channels: 2, SDPFmtpLine: "minptime=10;useinbandfec=1"},
 		PayloadType:        111,
 	},
 	"audio/AC3": {
@@ -129,22 +126,21 @@ var DefaultOutputCodecs = map[string]webrtc.RTPCodecParameters{
 }
 
 type GStreamerParameters struct {
-	Caps, Depayloader, DefaultEncoder, Payloader string
+	DefaultEncoder, Payloader string
 }
 
 var SupportedCodecs = map[string]GStreamerParameters{
 	webrtc.MimeTypeH264: {
-		"encoding-name=H264,packetization-mode=(string)1,profile-level-id=(string)42001f",
-		"rtph264depay", "x264enc speed-preset=veryfast tune=zerolatency key-int-max=20", "rtph264pay",
+		"video/x-raw,format=I420 ! x264enc speed-preset=ultrafast tune=zerolatency key-int-max=20 ! video/x-h264,stream-format=byte-stream", "rtph264pay",
 	},
 	webrtc.MimeTypeH265: {
-		"encoding-name=H265", "rtph265depay", "x265enc speed-preset=ultrafast tune=zerolatency key-int-max=20", "rtph265pay",
+		"x265enc speed-preset=ultrafast tune=zerolatency key-int-max=20", "rtph265pay",
 	},
 	webrtc.MimeTypeVP8: {
-		"encoding-name=VP8", "rtpvp8depay", "vp8enc end-usage=cq error-resilient=partitions keyframe-max-dist=10 auto-alt-ref=true cpu-used=5", "rtpvp8pay",
+		"vp8enc end-usage=cq error-resilient=partitions keyframe-max-dist=10 auto-alt-ref=true cpu-used=5", "rtpvp8pay",
 	},
 	webrtc.MimeTypeVP9: {
-		"encoding-name=VP9", "rtpvp9depay", "vp9enc end-usage=cq error-resilient=partitions keyframe-max-dist=10 auto-alt-ref=true cpu-used=5", "rtpvp9pay",
+		"vp9enc end-usage=cq error-resilient=partitions keyframe-max-dist=10 auto-alt-ref=true cpu-used=5", "rtpvp9pay",
 	},
 	// webrtc.MimeTypeAV1: {
 	// 	"rtpav1depay", "av1enc deadline=1", "rtpav1pay",
@@ -153,42 +149,11 @@ var SupportedCodecs = map[string]GStreamerParameters{
 	// 	},
 	// },
 
-	webrtc.MimeTypeOpus: {
-		"encoding-name=OPUS", "rtpopusdepay", "opusenc inband-fec=true", "rtpopuspay",
-	},
-	"audio/AAC": {
-		"encoding-name=MP4A-LATM,cpresent=(string)0,config=(string)40002320", "rtpmp4adepay", "avenc_aac", "rtpmp4apay",
-	},
-	"audio/SPEEX": {
-		"encoding-name=SPEEX", "rtpspeexdepay", "speexenc", "rtpspeexpay",
-	},
-	webrtc.MimeTypeG722: {
-		"", "rtpg722depay", "avenc_g722", "rtpg722pay",
-	},
-	webrtc.MimeTypePCMA: {
-		"encoding-name=PCMA", "rtppcmadepay", "alawenc", "rtppcmapay",
-	},
-	webrtc.MimeTypePCMU: {
-		"encoding-name=PCMU", "rtppcmudepay", "mulawenc", "rtppcmupay",
-	},
-	"audio/AC3": {
-		"encoding-name=AC3", "rtpac3depay", "avenc_ac3", "rtpac3pay",
-	},
-}
-
-var NativeDepacketizer = map[string]rtp.Depacketizer{
-	webrtc.MimeTypeH264: &codecs.H264Packet{},
-	webrtc.MimeTypeH265: &h265.H265Packet{},
-	webrtc.MimeTypeVP8:  &codecs.VP8Packet{},
-	webrtc.MimeTypeVP9:  &codecs.VP9Packet{},
-	webrtc.MimeTypeOpus: &codecs.OpusPacket{},
-}
-
-var NativePayloader = map[string]rtp.Payloader{
-	webrtc.MimeTypeH264: &codecs.H264Payloader{},
-	webrtc.MimeTypeH265: &h265.H265Payloader{},
-	webrtc.MimeTypeVP8:  &codecs.VP8Payloader{},
-	webrtc.MimeTypeVP9:  &codecs.VP9Payloader{},
-	webrtc.MimeTypeOpus: &codecs.OpusPayloader{},
-	webrtc.MimeTypeG722: &codecs.G722Payloader{},
+	webrtc.MimeTypeOpus: {"opusenc inband-fec=true", "rtpopuspay"},
+	"audio/AAC":         {"avenc_aac", "rtpmp4apay"},
+	"audio/SPEEX":       {"speexenc", "rtpspeexpay"},
+	webrtc.MimeTypeG722: {"avenc_g722", "rtpg722pay"},
+	webrtc.MimeTypePCMA: {"alawenc", "rtppcmapay"},
+	webrtc.MimeTypePCMU: {"mulawenc", "rtppcmupay"},
+	"audio/AC3":         {"avenc_ac3", "rtpac3pay"},
 }
