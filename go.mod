@@ -2,8 +2,6 @@ module github.com/muxable/transcoder
 
 go 1.17
 
-replace github.com/muxable/signal => ../signal
-
 require (
 	github.com/blendle/zapdriver v1.3.1
 	github.com/mattn/go-pointer v0.0.1
