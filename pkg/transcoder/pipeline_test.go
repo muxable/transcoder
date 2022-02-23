@@ -27,7 +27,7 @@ func TestPipeline_Empty(t *testing.T) {
 
 	p, err := s.NewReadWritePipeline(&webrtc.RTPCodecParameters{
 		RTPCodecCapability: webrtc.RTPCodecCapability{
-			MimeType: webrtc.MimeTypeH264,
+			MimeType:  webrtc.MimeTypeH264,
 			ClockRate: 90000,
 		},
 		PayloadType: 96,
