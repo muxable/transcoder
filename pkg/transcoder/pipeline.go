@@ -54,6 +54,9 @@ var sinkmap = map[*C.GstElement]*unsafePipeline{}
 var sourcemap = map[*C.GstElement]*unsafePipeline{}
 
 func (t *Transcoder) newUnsafePipeline(pipeline string, clockRate uint32) (*unsafePipeline, error) {
+	if clockRate == 0 {
+		return nil, errors.New("clock rate must be non-zero")
+	}
 	log.Printf("%v", pipeline)
 
 	cstr := C.CString(pipeline)

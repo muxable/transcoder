@@ -13,6 +13,7 @@ import "C"
 import (
 	"errors"
 	"fmt"
+	"math"
 	"runtime"
 	"time"
 	"unsafe"
@@ -162,7 +163,7 @@ type ReadWritePipeline interface {
 }
 
 func (s *Transcoder) NewReadOnlyPipeline(str string) (ReadOnlyPipeline, error) {
-	return s.newUnsafePipeline(fmt.Sprintf("%s ! queue ! appsink name=internal-sink sync=false async=false", str), 0)
+	return s.newUnsafePipeline(fmt.Sprintf("%s ! queue ! appsink name=internal-sink sync=false async=false", str), math.MaxUint32)
 }
 
 func (s *Transcoder) NewWriteOnlyPipeline(in *webrtc.RTPCodecParameters, str string) (WriteOnlyPipeline, error) {

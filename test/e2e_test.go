@@ -62,7 +62,7 @@ func runVideoTranscoder(t *testing.T, mime string, codec codecs.GStreamerParamet
 		t.Fatal(err)
 	}
 
-	qs, err := transcoder.NewPipelineBuilder(pcodec.MimeType, mime, "")
+	qs, err := transcoder.NewPipelineBuilder(webrtc.RTPCodecTypeVideo, mime, "")
 	if err != nil {
 		t.Fatal(err)
 	}
