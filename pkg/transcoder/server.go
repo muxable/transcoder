@@ -11,8 +11,8 @@ import (
 	"github.com/muxable/transcoder/internal/codecs"
 	"github.com/pion/interceptor"
 	"github.com/pion/rtcp"
-	"github.com/pion/rtp"
 	"github.com/pion/rtpio/pkg/rtpio"
+	"github.com/pion/rtpio/pkg/rtpiotest"
 	"github.com/pion/webrtc/v3"
 	"go.uber.org/zap"
 )
@@ -212,19 +212,6 @@ func (s *TranscoderServer) Subscribe(conn api.Transcoder_SubscribeServer) error 
 
 	matched.addSink(pipeline)
 
-	buf := make(chan *rtp.Packet, 1000) // this is to resolve the cyclic dependency.
-
-	go func() {
-		for {
-			p, err := pipeline.ReadRTP()
-			if err != nil {
-				close(buf)
-				return
-			}
-			buf <- p
-		}
-	}()
-
 	outCodec, err := pipeline.Codec()
 	if err != nil {
 		return err
@@ -236,19 +223,8 @@ func (s *TranscoderServer) Subscribe(conn api.Transcoder_SubscribeServer) error 
 	if err != nil {
 		return err
 	}
-	
-	go func() {
-		for {
-			p, ok := <-buf
-			if !ok {
-				return
-			}
-			if err := tl.WriteRTP(p); err != nil {
-				zap.L().Warn("failed to write rtp", zap.Error(err))
-				return
-			}
-		}
-	}()
+
+	go rtpio.CopyRTP(tl, rtpiotest.NewReadRTPLogger(matched.TrackRemote.ID(), pipeline))
 
 	m := &webrtc.MediaEngine{}
 
