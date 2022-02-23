@@ -16,7 +16,7 @@ import (
 )
 
 func TestTranscoding(t *testing.T) {
-	if os.Getenv("CI") != "" {
+	if _, ok := os.LookupEnv("DISPLAY"); !ok {
 		t.Skip("Skipping testing in CI environment")
 	}
 	for mime, codec := range codecs.SupportedCodecs {
