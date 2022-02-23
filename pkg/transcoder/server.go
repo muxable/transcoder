@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/muxable/signal/pkg/signal"
 	"github.com/muxable/transcoder/api"
 	"github.com/muxable/transcoder/internal/peerconnection"
 	"github.com/pion/rtcp"
@@ -45,7 +46,7 @@ func (s *TranscoderServer) Signal(conn api.Transcoder_SignalServer) error {
 		return err
 	}
 
-	signaller := peerconnection.Negotiate(peerConnection)
+	signaller := signal.Negotiate(peerConnection)
 
 	transcoder, err := NewTranscoder()
 	if err != nil {

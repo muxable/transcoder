@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/muxable/signal/pkg/signal"
 	"github.com/muxable/transcoder/api"
 	"github.com/muxable/transcoder/internal/peerconnection"
 	"github.com/pion/webrtc/v3"
@@ -31,7 +32,7 @@ func NewClient(ctx context.Context, conn *grpc.ClientConn) (*Client, error) {
 		return nil, err
 	}
 
-	signaller := peerconnection.Negotiate(peerConnection)
+	signaller := signal.Negotiate(peerConnection)
 
 	client := api.NewTranscoderClient(conn)
 
