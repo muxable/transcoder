@@ -104,18 +104,19 @@ func (x *TranscodeRequest) GetGstreamerPipeline() string {
 	return ""
 }
 
-type TranscodeResponse struct {
+type SubscribeRequest struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	StreamId    string `protobuf:"bytes,1,opt,name=stream_id,json=streamId,proto3" json:"stream_id,omitempty"`
-	TrackId     string `protobuf:"bytes,2,opt,name=track_id,json=trackId,proto3" json:"track_id,omitempty"`
-	RtpStreamId string `protobuf:"bytes,3,opt,name=rtp_stream_id,json=rtpStreamId,proto3" json:"rtp_stream_id,omitempty"`
+	// Types that are assignable to Operation:
+	//	*SubscribeRequest_Request
+	//	*SubscribeRequest_Signal
+	Operation isSubscribeRequest_Operation `protobuf_oneof:"operation"`
 }
 
-func (x *TranscodeResponse) Reset() {
-	*x = TranscodeResponse{}
+func (x *SubscribeRequest) Reset() {
+	*x = SubscribeRequest{}
 	if protoimpl.UnsafeEnabled {
 		mi := &file_transcoder_proto_msgTypes[1]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -123,13 +124,13 @@ func (x *TranscodeResponse) Reset() {
 	}
 }
 
-func (x *TranscodeResponse) String() string {
+func (x *SubscribeRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*TranscodeResponse) ProtoMessage() {}
+func (*SubscribeRequest) ProtoMessage() {}
 
-func (x *TranscodeResponse) ProtoReflect() protoreflect.Message {
+func (x *SubscribeRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_transcoder_proto_msgTypes[1]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -141,31 +142,47 @@ func (x *TranscodeResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use TranscodeResponse.ProtoReflect.Descriptor instead.
-func (*TranscodeResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use SubscribeRequest.ProtoReflect.Descriptor instead.
+func (*SubscribeRequest) Descriptor() ([]byte, []int) {
 	return file_transcoder_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *TranscodeResponse) GetStreamId() string {
-	if x != nil {
-		return x.StreamId
+func (m *SubscribeRequest) GetOperation() isSubscribeRequest_Operation {
+	if m != nil {
+		return m.Operation
 	}
-	return ""
+	return nil
 }
 
-func (x *TranscodeResponse) GetTrackId() string {
-	if x != nil {
-		return x.TrackId
+func (x *SubscribeRequest) GetRequest() *TranscodeRequest {
+	if x, ok := x.GetOperation().(*SubscribeRequest_Request); ok {
+		return x.Request
 	}
-	return ""
+	return nil
 }
 
-func (x *TranscodeResponse) GetRtpStreamId() string {
-	if x != nil {
-		return x.RtpStreamId
+func (x *SubscribeRequest) GetSignal() *anypb.Any {
+	if x, ok := x.GetOperation().(*SubscribeRequest_Signal); ok {
+		return x.Signal
 	}
-	return ""
+	return nil
 }
+
+type isSubscribeRequest_Operation interface {
+	isSubscribeRequest_Operation()
+}
+
+type SubscribeRequest_Request struct {
+	Request *TranscodeRequest `protobuf:"bytes,1,opt,name=request,proto3,oneof"`
+}
+
+type SubscribeRequest_Signal struct {
+	Signal *anypb.Any `protobuf:"bytes,2,opt,name=signal,proto3,oneof"`
+}
+
+func (*SubscribeRequest_Request) isSubscribeRequest_Operation() {}
+
+func (*SubscribeRequest_Signal) isSubscribeRequest_Operation() {}
 
 var File_transcoder_proto protoreflect.FileDescriptor
 
@@ -185,25 +202,26 @@ var file_transcoder_proto_rawDesc = []byte{
 	0x12, 0x2d, 0x0a, 0x12, 0x67, 0x73, 0x74, 0x72, 0x65, 0x61, 0x6d, 0x65, 0x72, 0x5f, 0x70, 0x69,
 	0x70, 0x65, 0x6c, 0x69, 0x6e, 0x65, 0x18, 0x05, 0x20, 0x01, 0x28, 0x09, 0x52, 0x11, 0x67, 0x73,
 	0x74, 0x72, 0x65, 0x61, 0x6d, 0x65, 0x72, 0x50, 0x69, 0x70, 0x65, 0x6c, 0x69, 0x6e, 0x65, 0x22,
-	0x6f, 0x0a, 0x11, 0x54, 0x72, 0x61, 0x6e, 0x73, 0x63, 0x6f, 0x64, 0x65, 0x52, 0x65, 0x73, 0x70,
-	0x6f, 0x6e, 0x73, 0x65, 0x12, 0x1b, 0x0a, 0x09, 0x73, 0x74, 0x72, 0x65, 0x61, 0x6d, 0x5f, 0x69,
-	0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x08, 0x73, 0x74, 0x72, 0x65, 0x61, 0x6d, 0x49,
-	0x64, 0x12, 0x19, 0x0a, 0x08, 0x74, 0x72, 0x61, 0x63, 0x6b, 0x5f, 0x69, 0x64, 0x18, 0x02, 0x20,
-	0x01, 0x28, 0x09, 0x52, 0x07, 0x74, 0x72, 0x61, 0x63, 0x6b, 0x49, 0x64, 0x12, 0x22, 0x0a, 0x0d,
-	0x72, 0x74, 0x70, 0x5f, 0x73, 0x74, 0x72, 0x65, 0x61, 0x6d, 0x5f, 0x69, 0x64, 0x18, 0x03, 0x20,
-	0x01, 0x28, 0x09, 0x52, 0x0b, 0x72, 0x74, 0x70, 0x53, 0x74, 0x72, 0x65, 0x61, 0x6d, 0x49, 0x64,
-	0x32, 0x86, 0x01, 0x0a, 0x0a, 0x54, 0x72, 0x61, 0x6e, 0x73, 0x63, 0x6f, 0x64, 0x65, 0x72, 0x12,
-	0x3a, 0x0a, 0x06, 0x53, 0x69, 0x67, 0x6e, 0x61, 0x6c, 0x12, 0x14, 0x2e, 0x67, 0x6f, 0x6f, 0x67,
-	0x6c, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x41, 0x6e, 0x79, 0x1a,
-	0x14, 0x2e, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75,
-	0x66, 0x2e, 0x41, 0x6e, 0x79, 0x22, 0x00, 0x28, 0x01, 0x30, 0x01, 0x12, 0x3c, 0x0a, 0x09, 0x54,
-	0x72, 0x61, 0x6e, 0x73, 0x63, 0x6f, 0x64, 0x65, 0x12, 0x15, 0x2e, 0x61, 0x70, 0x69, 0x2e, 0x54,
-	0x72, 0x61, 0x6e, 0x73, 0x63, 0x6f, 0x64, 0x65, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x1a,
-	0x16, 0x2e, 0x61, 0x70, 0x69, 0x2e, 0x54, 0x72, 0x61, 0x6e, 0x73, 0x63, 0x6f, 0x64, 0x65, 0x52,
-	0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x22, 0x00, 0x42, 0x23, 0x5a, 0x21, 0x67, 0x69, 0x74,
-	0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x6d, 0x75, 0x78, 0x61, 0x62, 0x6c, 0x65, 0x2f,
-	0x74, 0x72, 0x61, 0x6e, 0x73, 0x63, 0x6f, 0x64, 0x65, 0x72, 0x2f, 0x61, 0x70, 0x69, 0x62, 0x06,
-	0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
+	0x82, 0x01, 0x0a, 0x10, 0x53, 0x75, 0x62, 0x73, 0x63, 0x72, 0x69, 0x62, 0x65, 0x52, 0x65, 0x71,
+	0x75, 0x65, 0x73, 0x74, 0x12, 0x31, 0x0a, 0x07, 0x72, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x18,
+	0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x15, 0x2e, 0x61, 0x70, 0x69, 0x2e, 0x54, 0x72, 0x61, 0x6e,
+	0x73, 0x63, 0x6f, 0x64, 0x65, 0x52, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x48, 0x00, 0x52, 0x07,
+	0x72, 0x65, 0x71, 0x75, 0x65, 0x73, 0x74, 0x12, 0x2e, 0x0a, 0x06, 0x73, 0x69, 0x67, 0x6e, 0x61,
+	0x6c, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x14, 0x2e, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65,
+	0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x41, 0x6e, 0x79, 0x48, 0x00, 0x52,
+	0x06, 0x73, 0x69, 0x67, 0x6e, 0x61, 0x6c, 0x42, 0x0b, 0x0a, 0x09, 0x6f, 0x70, 0x65, 0x72, 0x61,
+	0x74, 0x69, 0x6f, 0x6e, 0x32, 0x89, 0x01, 0x0a, 0x0a, 0x54, 0x72, 0x61, 0x6e, 0x73, 0x63, 0x6f,
+	0x64, 0x65, 0x72, 0x12, 0x3b, 0x0a, 0x07, 0x50, 0x75, 0x62, 0x6c, 0x69, 0x73, 0x68, 0x12, 0x14,
+	0x2e, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66,
+	0x2e, 0x41, 0x6e, 0x79, 0x1a, 0x14, 0x2e, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e, 0x70, 0x72,
+	0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x41, 0x6e, 0x79, 0x22, 0x00, 0x28, 0x01, 0x30, 0x01,
+	0x12, 0x3e, 0x0a, 0x09, 0x53, 0x75, 0x62, 0x73, 0x63, 0x72, 0x69, 0x62, 0x65, 0x12, 0x15, 0x2e,
+	0x61, 0x70, 0x69, 0x2e, 0x53, 0x75, 0x62, 0x73, 0x63, 0x72, 0x69, 0x62, 0x65, 0x52, 0x65, 0x71,
+	0x75, 0x65, 0x73, 0x74, 0x1a, 0x14, 0x2e, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e, 0x70, 0x72,
+	0x6f, 0x74, 0x6f, 0x62, 0x75, 0x66, 0x2e, 0x41, 0x6e, 0x79, 0x22, 0x00, 0x28, 0x01, 0x30, 0x01,
+	0x42, 0x23, 0x5a, 0x21, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2e, 0x63, 0x6f, 0x6d, 0x2f, 0x6d,
+	0x75, 0x78, 0x61, 0x62, 0x6c, 0x65, 0x2f, 0x74, 0x72, 0x61, 0x6e, 0x73, 0x63, 0x6f, 0x64, 0x65,
+	0x72, 0x2f, 0x61, 0x70, 0x69, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x33,
 }
 
 var (
@@ -220,20 +238,22 @@ func file_transcoder_proto_rawDescGZIP() []byte {
 
 var file_transcoder_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
 var file_transcoder_proto_goTypes = []interface{}{
-	(*TranscodeRequest)(nil),  // 0: api.TranscodeRequest
-	(*TranscodeResponse)(nil), // 1: api.TranscodeResponse
-	(*anypb.Any)(nil),         // 2: google.protobuf.Any
+	(*TranscodeRequest)(nil), // 0: api.TranscodeRequest
+	(*SubscribeRequest)(nil), // 1: api.SubscribeRequest
+	(*anypb.Any)(nil),        // 2: google.protobuf.Any
 }
 var file_transcoder_proto_depIdxs = []int32{
-	2, // 0: api.Transcoder.Signal:input_type -> google.protobuf.Any
-	0, // 1: api.Transcoder.Transcode:input_type -> api.TranscodeRequest
-	2, // 2: api.Transcoder.Signal:output_type -> google.protobuf.Any
-	1, // 3: api.Transcoder.Transcode:output_type -> api.TranscodeResponse
-	2, // [2:4] is the sub-list for method output_type
-	0, // [0:2] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	0, // 0: api.SubscribeRequest.request:type_name -> api.TranscodeRequest
+	2, // 1: api.SubscribeRequest.signal:type_name -> google.protobuf.Any
+	2, // 2: api.Transcoder.Publish:input_type -> google.protobuf.Any
+	1, // 3: api.Transcoder.Subscribe:input_type -> api.SubscribeRequest
+	2, // 4: api.Transcoder.Publish:output_type -> google.protobuf.Any
+	2, // 5: api.Transcoder.Subscribe:output_type -> google.protobuf.Any
+	4, // [4:6] is the sub-list for method output_type
+	2, // [2:4] is the sub-list for method input_type
+	2, // [2:2] is the sub-list for extension type_name
+	2, // [2:2] is the sub-list for extension extendee
+	0, // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_transcoder_proto_init() }
@@ -255,7 +275,7 @@ func file_transcoder_proto_init() {
 			}
 		}
 		file_transcoder_proto_msgTypes[1].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*TranscodeResponse); i {
+			switch v := v.(*SubscribeRequest); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -266,6 +286,10 @@ func file_transcoder_proto_init() {
 				return nil
 			}
 		}
+	}
+	file_transcoder_proto_msgTypes[1].OneofWrappers = []interface{}{
+		(*SubscribeRequest_Request)(nil),
+		(*SubscribeRequest_Signal)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -299,8 +323,8 @@ const _ = grpc.SupportPackageIsVersion6
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://godoc.org/google.golang.org/grpc#ClientConn.NewStream.
 type TranscoderClient interface {
-	Signal(ctx context.Context, opts ...grpc.CallOption) (Transcoder_SignalClient, error)
-	Transcode(ctx context.Context, in *TranscodeRequest, opts ...grpc.CallOption) (*TranscodeResponse, error)
+	Publish(ctx context.Context, opts ...grpc.CallOption) (Transcoder_PublishClient, error)
+	Subscribe(ctx context.Context, opts ...grpc.CallOption) (Transcoder_SubscribeClient, error)
 }
 
 type transcoderClient struct {
@@ -311,30 +335,30 @@ func NewTranscoderClient(cc grpc.ClientConnInterface) TranscoderClient {
 	return &transcoderClient{cc}
 }
 
-func (c *transcoderClient) Signal(ctx context.Context, opts ...grpc.CallOption) (Transcoder_SignalClient, error) {
-	stream, err := c.cc.NewStream(ctx, &_Transcoder_serviceDesc.Streams[0], "/api.Transcoder/Signal", opts...)
+func (c *transcoderClient) Publish(ctx context.Context, opts ...grpc.CallOption) (Transcoder_PublishClient, error) {
+	stream, err := c.cc.NewStream(ctx, &_Transcoder_serviceDesc.Streams[0], "/api.Transcoder/Publish", opts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &transcoderSignalClient{stream}
+	x := &transcoderPublishClient{stream}
 	return x, nil
 }
 
-type Transcoder_SignalClient interface {
+type Transcoder_PublishClient interface {
 	Send(*anypb.Any) error
 	Recv() (*anypb.Any, error)
 	grpc.ClientStream
 }
 
-type transcoderSignalClient struct {
+type transcoderPublishClient struct {
 	grpc.ClientStream
 }
 
-func (x *transcoderSignalClient) Send(m *anypb.Any) error {
+func (x *transcoderPublishClient) Send(m *anypb.Any) error {
 	return x.ClientStream.SendMsg(m)
 }
 
-func (x *transcoderSignalClient) Recv() (*anypb.Any, error) {
+func (x *transcoderPublishClient) Recv() (*anypb.Any, error) {
 	m := new(anypb.Any)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
@@ -342,55 +366,77 @@ func (x *transcoderSignalClient) Recv() (*anypb.Any, error) {
 	return m, nil
 }
 
-func (c *transcoderClient) Transcode(ctx context.Context, in *TranscodeRequest, opts ...grpc.CallOption) (*TranscodeResponse, error) {
-	out := new(TranscodeResponse)
-	err := c.cc.Invoke(ctx, "/api.Transcoder/Transcode", in, out, opts...)
+func (c *transcoderClient) Subscribe(ctx context.Context, opts ...grpc.CallOption) (Transcoder_SubscribeClient, error) {
+	stream, err := c.cc.NewStream(ctx, &_Transcoder_serviceDesc.Streams[1], "/api.Transcoder/Subscribe", opts...)
 	if err != nil {
 		return nil, err
 	}
-	return out, nil
+	x := &transcoderSubscribeClient{stream}
+	return x, nil
+}
+
+type Transcoder_SubscribeClient interface {
+	Send(*SubscribeRequest) error
+	Recv() (*anypb.Any, error)
+	grpc.ClientStream
+}
+
+type transcoderSubscribeClient struct {
+	grpc.ClientStream
+}
+
+func (x *transcoderSubscribeClient) Send(m *SubscribeRequest) error {
+	return x.ClientStream.SendMsg(m)
+}
+
+func (x *transcoderSubscribeClient) Recv() (*anypb.Any, error) {
+	m := new(anypb.Any)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
 }
 
 // TranscoderServer is the server API for Transcoder service.
 type TranscoderServer interface {
-	Signal(Transcoder_SignalServer) error
-	Transcode(context.Context, *TranscodeRequest) (*TranscodeResponse, error)
+	Publish(Transcoder_PublishServer) error
+	Subscribe(Transcoder_SubscribeServer) error
 }
 
 // UnimplementedTranscoderServer can be embedded to have forward compatible implementations.
 type UnimplementedTranscoderServer struct {
 }
 
-func (*UnimplementedTranscoderServer) Signal(Transcoder_SignalServer) error {
-	return status.Errorf(codes.Unimplemented, "method Signal not implemented")
+func (*UnimplementedTranscoderServer) Publish(Transcoder_PublishServer) error {
+	return status.Errorf(codes.Unimplemented, "method Publish not implemented")
 }
-func (*UnimplementedTranscoderServer) Transcode(context.Context, *TranscodeRequest) (*TranscodeResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Transcode not implemented")
+func (*UnimplementedTranscoderServer) Subscribe(Transcoder_SubscribeServer) error {
+	return status.Errorf(codes.Unimplemented, "method Subscribe not implemented")
 }
 
 func RegisterTranscoderServer(s *grpc.Server, srv TranscoderServer) {
 	s.RegisterService(&_Transcoder_serviceDesc, srv)
 }
 
-func _Transcoder_Signal_Handler(srv interface{}, stream grpc.ServerStream) error {
-	return srv.(TranscoderServer).Signal(&transcoderSignalServer{stream})
+func _Transcoder_Publish_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(TranscoderServer).Publish(&transcoderPublishServer{stream})
 }
 
-type Transcoder_SignalServer interface {
+type Transcoder_PublishServer interface {
 	Send(*anypb.Any) error
 	Recv() (*anypb.Any, error)
 	grpc.ServerStream
 }
 
-type transcoderSignalServer struct {
+type transcoderPublishServer struct {
 	grpc.ServerStream
 }
 
-func (x *transcoderSignalServer) Send(m *anypb.Any) error {
+func (x *transcoderPublishServer) Send(m *anypb.Any) error {
 	return x.ServerStream.SendMsg(m)
 }
 
-func (x *transcoderSignalServer) Recv() (*anypb.Any, error) {
+func (x *transcoderPublishServer) Recv() (*anypb.Any, error) {
 	m := new(anypb.Any)
 	if err := x.ServerStream.RecvMsg(m); err != nil {
 		return nil, err
@@ -398,37 +444,46 @@ func (x *transcoderSignalServer) Recv() (*anypb.Any, error) {
 	return m, nil
 }
 
-func _Transcoder_Transcode_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(TranscodeRequest)
-	if err := dec(in); err != nil {
+func _Transcoder_Subscribe_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(TranscoderServer).Subscribe(&transcoderSubscribeServer{stream})
+}
+
+type Transcoder_SubscribeServer interface {
+	Send(*anypb.Any) error
+	Recv() (*SubscribeRequest, error)
+	grpc.ServerStream
+}
+
+type transcoderSubscribeServer struct {
+	grpc.ServerStream
+}
+
+func (x *transcoderSubscribeServer) Send(m *anypb.Any) error {
+	return x.ServerStream.SendMsg(m)
+}
+
+func (x *transcoderSubscribeServer) Recv() (*SubscribeRequest, error) {
+	m := new(SubscribeRequest)
+	if err := x.ServerStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
-	if interceptor == nil {
-		return srv.(TranscoderServer).Transcode(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/api.Transcoder/Transcode",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(TranscoderServer).Transcode(ctx, req.(*TranscodeRequest))
-	}
-	return interceptor(ctx, in, info, handler)
+	return m, nil
 }
 
 var _Transcoder_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "api.Transcoder",
 	HandlerType: (*TranscoderServer)(nil),
-	Methods: []grpc.MethodDesc{
-		{
-			MethodName: "Transcode",
-			Handler:    _Transcoder_Transcode_Handler,
-		},
-	},
+	Methods:     []grpc.MethodDesc{},
 	Streams: []grpc.StreamDesc{
 		{
-			StreamName:    "Signal",
-			Handler:       _Transcoder_Signal_Handler,
+			StreamName:    "Publish",
+			Handler:       _Transcoder_Publish_Handler,
+			ServerStreams: true,
+			ClientStreams: true,
+		},
+		{
+			StreamName:    "Subscribe",
+			Handler:       _Transcoder_Subscribe_Handler,
 			ServerStreams: true,
 			ClientStreams: true,
 		},

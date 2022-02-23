@@ -7,8 +7,8 @@ import "google/protobuf/any.proto";
 package api;
 
 service Transcoder {
-  rpc Signal(stream google.protobuf.Any) returns (stream google.protobuf.Any) {}
-  rpc Transcode(TranscodeRequest) returns (TranscodeResponse) {}
+  rpc Publish(stream google.protobuf.Any) returns (stream google.protobuf.Any) {}
+  rpc Subscribe(stream SubscribeRequest) returns (stream google.protobuf.Any) {}
 }
 
 message TranscodeRequest {
@@ -20,8 +20,9 @@ message TranscodeRequest {
   string gstreamer_pipeline = 5;
 }
 
-message TranscodeResponse {
-  string stream_id = 1;
-  string track_id = 2;
-  string rtp_stream_id = 3;
+message SubscribeRequest {
+  oneof operation {
+    TranscodeRequest request = 1;
+    google.protobuf.Any signal = 2;
+  }
 }

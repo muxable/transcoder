@@ -160,7 +160,9 @@ func goSinkPadEventFunc(pad *C.GstPad, obj *C.GstObject, event *C.GstEvent) C.gb
 }
 
 func (p *unsafePipeline) sinkCaps() (*Caps, error) {
+	log.Printf("waiting for caps negotiation")
 	p.capsNegotiated.Wait()
+	log.Printf("done")
 	pad := C.gst_element_get_static_pad((*C.GstElement)(unsafe.Pointer(p.sink)), csink)
 	if pad == nil {
 		return nil, errors.New("failed to get src pad")
