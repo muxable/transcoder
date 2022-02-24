@@ -12,7 +12,6 @@ import (
 	"github.com/pion/interceptor"
 	"github.com/pion/rtcp"
 	"github.com/pion/rtpio/pkg/rtpio"
-	"github.com/pion/rtpio/pkg/rtpiotest"
 	"github.com/pion/webrtc/v3"
 	"go.uber.org/zap"
 )
@@ -224,7 +223,7 @@ func (s *TranscoderServer) Subscribe(conn api.Transcoder_SubscribeServer) error 
 		return err
 	}
 
-	go rtpio.CopyRTP(tl, rtpiotest.NewReadRTPLogger(matched.TrackRemote.ID(), pipeline))
+	go rtpio.CopyRTP(tl, pipeline)
 
 	m := &webrtc.MediaEngine{}
 

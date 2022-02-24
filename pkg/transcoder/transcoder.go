@@ -171,7 +171,7 @@ func (s *Transcoder) NewWriteOnlyPipeline(in *webrtc.RTPCodecParameters, str str
 	if err != nil {
 		return nil, err
 	}
-	return s.newUnsafePipeline(fmt.Sprintf("appsrc format=time name=internal-source ! %s ! queue ! %s", inCaps.String(), str), in.ClockRate)
+	return s.newUnsafePipeline(fmt.Sprintf("appsrc is-live=true format=time name=internal-source ! %s ! queue ! %s", inCaps.String(), str), in.ClockRate)
 }
 
 func (s *Transcoder) NewReadWritePipeline(in *webrtc.RTPCodecParameters, str string) (ReadWritePipeline, error) {
@@ -179,5 +179,5 @@ func (s *Transcoder) NewReadWritePipeline(in *webrtc.RTPCodecParameters, str str
 	if err != nil {
 		return nil, err
 	}
-	return s.newUnsafePipeline(fmt.Sprintf("appsrc format=time name=internal-source ! %s ! queue ! %s ! queue ! appsink name=internal-sink sync=false async=false", inCaps.String(), str), in.ClockRate)
+	return s.newUnsafePipeline(fmt.Sprintf("appsrc is-live=true format=time name=internal-source ! %s ! queue ! %s ! queue ! appsink name=internal-sink sync=false async=false", inCaps.String(), str), in.ClockRate)
 }

@@ -131,7 +131,7 @@ type GStreamerParameters struct {
 
 var SupportedCodecs = map[string]GStreamerParameters{
 	webrtc.MimeTypeH264: {
-		"video/x-raw,format=I420 ! x264enc speed-preset=ultrafast tune=zerolatency key-int-max=20 ! video/x-h264,stream-format=byte-stream", "rtph264pay",
+		"video/x-raw,format=I420 ! x264enc pass=5 quantizer=25 speed-preset=fast key-int-max=20 byte-stream=true", "rtph264pay pt=102 config-interval=-1",
 	},
 	webrtc.MimeTypeH265: {
 		"x265enc speed-preset=ultrafast tune=zerolatency key-int-max=20", "rtph265pay",
@@ -149,7 +149,7 @@ var SupportedCodecs = map[string]GStreamerParameters{
 	// 	},
 	// },
 
-	webrtc.MimeTypeOpus: {"opusenc inband-fec=true", "rtpopuspay"},
+	webrtc.MimeTypeOpus: {"opusenc inband-fec=true", "rtpopuspay pt=111"},
 	"audio/AAC":         {"avenc_aac", "rtpmp4apay"},
 	"audio/SPEEX":       {"speexenc", "rtpspeexpay"},
 	webrtc.MimeTypeG722: {"avenc_g722", "rtpg722pay"},

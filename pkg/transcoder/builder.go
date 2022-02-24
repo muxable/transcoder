@@ -29,9 +29,9 @@ func NewPipelineBuilder(kind webrtc.RTPCodecType, to string, via string) (string
 
 	switch kind {
 	case webrtc.RTPCodecTypeVideo:
-		return fmt.Sprintf("decodebin ! queue ! videoconvert ! queue ! %s ! %s", via, outputParams.Payloader), nil
+		return fmt.Sprintf("decodebin ! queue ! videoconvert ! queue ! %s ! %s mtu=1200", via, outputParams.Payloader), nil
 	case webrtc.RTPCodecTypeAudio:
-		return fmt.Sprintf("decodebin ! queue ! audioconvert ! queue ! %s ! %s", via, outputParams.Payloader), nil
+		return fmt.Sprintf("decodebin ! queue ! audioconvert ! queue ! %s ! %s mtu=1200", via, outputParams.Payloader), nil
 	}
 	return "", fmt.Errorf("unsupported codec %s", to)
 }
