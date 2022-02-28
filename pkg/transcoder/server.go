@@ -3,14 +3,16 @@ package transcoder
 import (
 	"errors"
 	"log"
+	"net"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/muxable/signal/pkg/signal"
 	"github.com/muxable/transcoder/api"
 	"github.com/muxable/transcoder/internal/codecs"
+	"github.com/muxable/transcoder/internal/udpav"
 	"github.com/pion/interceptor"
-	"github.com/pion/rtcp"
 	"github.com/pion/rtpio/pkg/rtpio"
 	"github.com/pion/webrtc/v3"
 	"go.uber.org/zap"
@@ -27,6 +29,7 @@ func (s *Source) addSink(sink rtpio.RTPWriteCloser) {
 	s.sinks = append(s.sinks, sink)
 	if len(s.sinks) == 1 {
 		go func() {
+			dial, _ := net.DialUDP("udp", nil, &net.UDPAddr{IP: net.IPv4(127,0,0,1), Port: 5020})
 			for {
 				p, _, err := s.TrackRemote.ReadRTP()
 				if err != nil {
@@ -35,6 +38,11 @@ func (s *Source) addSink(sink rtpio.RTPWriteCloser) {
 					}
 					return
 				}
+				buf, err := p.Marshal()
+				if err != nil {
+					zap.L().Error("failed to marshal rtp packet", zap.Error(err))
+				}
+				dial.Write(buf)
 				for _, sink := range s.sinks {
 					if err := sink.WriteRTP(p); err != nil {
 
@@ -188,42 +196,56 @@ func (s *TranscoderServer) Subscribe(conn api.Transcoder_SubscribeServer) error 
 		s.onTrack.L.Unlock()
 	}
 
-	builder, err := NewPipelineBuilder(matched.TrackRemote.Kind(), op.Request.MimeType, op.Request.GstreamerPipeline)
-	if err != nil {
-		return err
-	}
-
 	inCodec := matched.TrackRemote.Codec()
-	tc, err := s.transcoderFor(matched.TrackRemote.StreamID())
-	if err != nil {
-		return err
-	}
-	pipeline, err := tc.NewReadWritePipeline(&inCodec, builder)
-	if err != nil {
-		return err
-	}
+	// tc, err := s.transcoderFor(matched.TrackRemote.StreamID())
+	// if err != nil {
+	// 	return err
+	// }
 
-	pipeline.OnUpstreamForceKeyUnit(func() {
-		if err := matched.PeerConnection.WriteRTCP([]rtcp.Packet{&rtcp.PictureLossIndication{MediaSSRC: uint32(matched.TrackRemote.SSRC())}}); err != nil {
-			zap.L().Warn("failed to write rtcp", zap.Error(err))
-		}
-	})
-
-	matched.addSink(pipeline)
-
-	outCodec, err := pipeline.Codec()
+	tc, err := udpav.NewTranscoder(inCodec, webrtc.RTPCodecCapability{})
 	if err != nil {
 		return err
 	}
 
-	log.Printf("negotiated %v", outCodec)
+	time.Sleep(100 * time.Millisecond)
+	// builder, err := NewPipelineBuilder(matched.TrackRemote.Kind(), op.Request.MimeType, op.Request.GstreamerPipeline)
+	// if err != nil {
+	// 	return err
+	// }
+	// pipeline, err := tc.NewReadWritePipeline(&inCodec, builder)
+	// if err != nil {
+	// 	return err
+	// }
+
+	// pipeline.OnUpstreamForceKeyUnit(func() {
+	// 	if err := matched.PeerConnection.WriteRTCP([]rtcp.Packet{&rtcp.PictureLossIndication{MediaSSRC: uint32(matched.TrackRemote.SSRC())}}); err != nil {
+	// 		zap.L().Warn("failed to write rtcp", zap.Error(err))
+	// 	}
+	// })
+
+	matched.addSink(tc)
+
+	// outCodec, err := pipeline.Codec()
+	// if err != nil {
+	// 	return err
+	// }
+
+	// log.Printf("negotiated %v", outCodec)
+
+	outCodec := &webrtc.RTPCodecParameters{
+		PayloadType: webrtc.PayloadType(96),
+		RTPCodecCapability: webrtc.RTPCodecCapability{
+			MimeType: webrtc.MimeTypeH264,
+			ClockRate: 90000,
+		},
+	}
 
 	tl, err := webrtc.NewTrackLocalStaticRTP(outCodec.RTPCodecCapability, matched.TrackRemote.ID(), matched.TrackRemote.StreamID())
 	if err != nil {
 		return err
 	}
 
-	go rtpio.CopyRTP(tl, pipeline)
+	go rtpio.CopyRTP(tl, tc)
 
 	m := &webrtc.MediaEngine{}
 

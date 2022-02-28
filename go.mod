@@ -35,6 +35,7 @@ require (
 	github.com/pion/rtcp v1.2.9
 	github.com/pion/rtp v1.7.4
 	github.com/pion/sctp v1.8.2 // indirect
+	github.com/pion/sdp v1.3.0
 	github.com/pion/sdp/v3 v3.0.4 // indirect
 	github.com/pion/srtp/v2 v2.0.5 // indirect
 	github.com/pion/stun v0.3.5 // indirect
