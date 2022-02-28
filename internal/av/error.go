@@ -12,6 +12,10 @@ import (
 	"unsafe"
 )
 
+func AVERROR(code C.int) C.int {
+	return -code
+}
+
 func av_err(prefix string, averr C.int) error {
 	if averr == -541478725 { // special error code.
 		return io.EOF

@@ -55,6 +55,7 @@ func (c *EncodeContext) init() error {
 	encoderctx.time_base = C.av_make_q(C.int(1), C.int(c.codec.ClockRate))
 
 	var opts *C.AVDictionary
+	defer C.av_dict_free(&opts)
 
 	if c.codec.MimeType == webrtc.MimeTypeH264 {
 		if averr := C.av_dict_set(&opts, C.CString("preset"), C.CString("ultrafast"), 0); averr < 0 {
@@ -83,7 +84,7 @@ func (c *EncodeContext) init() error {
 
 func (c *EncodeContext) ReadAVPacket(p *AVPacket) error {
 	if res := C.avcodec_receive_packet(c.encoderctx, p.packet); res < 0 {
-		if res == -11 { // eagain
+		if res == AVERROR(C.EAGAIN) {
 			err := c.decoder.ReadAVFrame(c.frame)
 			if err != nil && err != io.EOF {
 				return err

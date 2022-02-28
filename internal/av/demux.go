@@ -9,6 +9,7 @@ import "C"
 import (
 	"errors"
 	"io"
+	"log"
 	"os"
 	"unsafe"
 
@@ -81,15 +82,16 @@ func (c *DemuxContext) init() error {
 	}
 
 	var opts *C.AVDictionary
-	// if averr := C.av_dict_set(&opts, csdpflags, ccustomio, 0); averr < 0 {
+	defer C.av_dict_free(&opts)
+	if averr := C.av_dict_set(&opts, csdpflags, ccustomio, 0); averr < 0 {
+		return av_err("av_dict_set", averr)
+	}
+	if averr := C.av_dict_set_int(&opts, creorderqueuesize, C.int64_t(0), 0); averr < 0 {
+		return av_err("av_dict_set", averr)
+	}
+	// if averr := C.av_dict_set(&opts, C.CString("protocol_whitelist"), C.CString("file,udp,rtp"), 0); averr < 0 {
 	// 	return av_err("av_dict_set", averr)
 	// }
-	if averr := C.av_dict_set_int(&opts, creorderqueuesize, C.long(0), 0); averr < 0 {
-		return av_err("av_dict_set", averr)
-	}
-	if averr := C.av_dict_set(&opts, C.CString("protocol_whitelist"), C.CString("file,udp,rtp"), 0); averr < 0 {
-		return av_err("av_dict_set", averr)
-	}
 
 	sdpfile, err := NewTempSDP(c.codec)
 	if err != nil {
@@ -113,7 +115,7 @@ func (c *DemuxContext) init() error {
 		return errors.New("failed to allocate avio context")
 	}
 
-	// avformatctx.pb = avioctx
+	avformatctx.pb = avioctx
 
 	if averr := C.avformat_find_stream_info(avformatctx, nil); averr < C.int(0) {
 		return av_err("avformat_find_stream_info", averr)
@@ -126,7 +128,9 @@ func (c *DemuxContext) init() error {
 }
 
 func (c *DemuxContext) ReadAVPacket(p *AVPacket) error {
+	log.Printf("read frame")
 	averr := C.av_read_frame(c.avformatctx, p.packet)
+	log.Printf("read frame return %v", averr)
 	if averr < 0 {
 		err := av_err("av_read_frame", averr)
 		if err == io.EOF {

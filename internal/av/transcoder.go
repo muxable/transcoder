@@ -11,7 +11,7 @@ import (
 )
 
 func init() {
-	C.av_log_set_level(24)
+	C.av_log_set_level(48)
 }
 
 type Transcoder struct {

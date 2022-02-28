@@ -70,7 +70,7 @@ func (c *DecodeContext) init() error {
 
 func (c *DecodeContext) ReadAVFrame(f *AVFrame) error {
 	if res := C.avcodec_receive_frame(c.decoderctx, f.frame); res < 0 {
-		if res == -11 { // eagain
+		if res == AVERROR(C.EAGAIN) {
 			err := c.demuxer.ReadAVPacket(c.pkt)
 			if err != nil && err != io.EOF {
 				return err

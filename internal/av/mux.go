@@ -1,13 +1,15 @@
 package av
 
 /*
-#cgo pkg-config: libavformat
+#cgo pkg-config: libavcodec libavformat
+#include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
 #include "mux.h"
 */
 import "C"
 import (
 	"errors"
+	"io"
 	"unsafe"
 
 	"github.com/mattn/go-pointer"
@@ -20,12 +22,17 @@ var (
 	crtp = C.CString("rtp")
 )
 
+type result struct {
+	p *rtp.Packet
+	e error
+}
+
 type MuxContext struct {
 	codec       webrtc.RTPCodecCapability
 	avformatctx *C.AVFormatContext
 	packet      *AVPacket
 	encoder     *EncodeContext
-	pch         chan *rtp.Packet
+	pch         chan *result
 }
 
 func NewMuxer(codec webrtc.RTPCodecCapability, encoder *EncodeContext) *MuxContext {
@@ -33,17 +40,22 @@ func NewMuxer(codec webrtc.RTPCodecCapability, encoder *EncodeContext) *MuxConte
 		codec:   codec,
 		packet:  NewAVPacket(),
 		encoder: encoder,
-		pch:     make(chan *rtp.Packet),
+		pch:     make(chan *result),
 	}
 	go func() {
+		defer close(c.pch)
 		if err := c.init(); err != nil {
+			c.pch <- &result{e: err}
 			return
 		}
 		for {
 			if err := c.encoder.ReadAVPacket(c.packet); err != nil {
+			c.pch <- &result{e: err}
+			close(c.pch)
 				return
 			}
 			if averr := C.av_write_frame(c.avformatctx, c.packet.packet); averr < 0 {
+				c.pch <- &result{e: av_err("av_write_frame", averr)}
 				return
 			}
 		}
@@ -60,7 +72,7 @@ func goWritePacketFunc(opaque unsafe.Pointer, buf *C.uint8_t, bufsize C.int) C.i
 		zap.L().Error("failed to unmarshal rtp packet", zap.Error(err))
 		return C.int(-1)
 	}
-	m.pch <- p
+	m.pch <- &result{p: p}
 	return bufsize
 }
 
@@ -113,5 +125,9 @@ func (c *MuxContext) init() error {
 }
 
 func (c *MuxContext) ReadRTP() (*rtp.Packet, error) {
-	return <-c.pch, nil
+	r, ok := <-c.pch
+	if !ok {
+		return nil, io.EOF
+	}
+	return r.p, r.e
 }
