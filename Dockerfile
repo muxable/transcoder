@@ -19,6 +19,4 @@ ENV APP_ENV=production
 EXPOSE 5000-5200/udp
 EXPOSE 50051/tcp
 
-RUN go test ./...
-
 CMD [ "/transcoder" ]
