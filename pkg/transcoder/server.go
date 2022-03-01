@@ -6,12 +6,11 @@ import (
 	"net"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/muxable/signal/pkg/signal"
 	"github.com/muxable/transcoder/api"
+	"github.com/muxable/transcoder/internal/av"
 	"github.com/muxable/transcoder/internal/codecs"
-	"github.com/muxable/transcoder/internal/udpav"
 	"github.com/pion/interceptor"
 	"github.com/pion/rtpio/pkg/rtpio"
 	"github.com/pion/webrtc/v3"
@@ -45,7 +44,7 @@ func (s *Source) addSink(sink rtpio.RTPWriteCloser) {
 				dial.Write(buf)
 				for _, sink := range s.sinks {
 					if err := sink.WriteRTP(p); err != nil {
-
+						zap.L().Error("failed to write rtp packet", zap.Error(err))
 					}
 				}
 			}
@@ -63,30 +62,13 @@ type TranscoderServer struct {
 
 	// this is like the poor man's rx behavior subject.
 	onTrack *sync.Cond
-
-	transcoders map[string]*Transcoder
 }
 
 func NewTranscoderServer(config webrtc.Configuration) *TranscoderServer {
 	return &TranscoderServer{
 		config:      config,
 		onTrack:     sync.NewCond(&sync.Mutex{}),
-		transcoders: make(map[string]*Transcoder),
 	}
-}
-
-func (s *TranscoderServer) transcoderFor(streamID string) (*Transcoder, error) {
-	t, ok := s.transcoders[streamID]
-	if ok {
-		return t, nil
-	}
-
-	t, err := NewTranscoder()
-	if err != nil {
-		return nil, err
-	}
-	s.transcoders[streamID] = t
-	return t, nil
 }
 
 func (s *TranscoderServer) Publish(conn api.Transcoder_PublishServer) error {
@@ -197,40 +179,13 @@ func (s *TranscoderServer) Subscribe(conn api.Transcoder_SubscribeServer) error 
 	}
 
 	inCodec := matched.TrackRemote.Codec()
-	// tc, err := s.transcoderFor(matched.TrackRemote.StreamID())
-	// if err != nil {
-	// 	return err
-	// }
 
-	tc, err := udpav.NewTranscoder(inCodec, webrtc.RTPCodecCapability{})
+	tc, err := av.NewTranscoder(inCodec, webrtc.RTPCodecCapability{})
 	if err != nil {
 		return err
 	}
 
-	time.Sleep(100 * time.Millisecond)
-	// builder, err := NewPipelineBuilder(matched.TrackRemote.Kind(), op.Request.MimeType, op.Request.GstreamerPipeline)
-	// if err != nil {
-	// 	return err
-	// }
-	// pipeline, err := tc.NewReadWritePipeline(&inCodec, builder)
-	// if err != nil {
-	// 	return err
-	// }
-
-	// pipeline.OnUpstreamForceKeyUnit(func() {
-	// 	if err := matched.PeerConnection.WriteRTCP([]rtcp.Packet{&rtcp.PictureLossIndication{MediaSSRC: uint32(matched.TrackRemote.SSRC())}}); err != nil {
-	// 		zap.L().Warn("failed to write rtcp", zap.Error(err))
-	// 	}
-	// })
-
 	matched.addSink(tc)
-
-	// outCodec, err := pipeline.Codec()
-	// if err != nil {
-	// 	return err
-	// }
-
-	// log.Printf("negotiated %v", outCodec)
 
 	outCodec := &webrtc.RTPCodecParameters{
 		PayloadType: webrtc.PayloadType(96),
