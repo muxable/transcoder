@@ -86,7 +86,7 @@ func (c *MuxContext) init() error {
 		return errors.New("failed to find rtp output format")
 	}
 
-	buf := C.av_malloc(1500)
+	buf := C.av_malloc(1200)
 	if buf == nil {
 		return errors.New("failed to allocate buffer")
 	}
@@ -97,7 +97,7 @@ func (c *MuxContext) init() error {
 		return av_err("avformat_alloc_output_context2", averr)
 	}
 
-	avioctx := C.avio_alloc_context((*C.uchar)(buf), 1500, 1, pointer.Save(c), nil, (*[0]byte)(C.cgoWritePacketFunc), nil)
+	avioctx := C.avio_alloc_context((*C.uchar)(buf), 1200, 1, pointer.Save(c), nil, (*[0]byte)(C.cgoWritePacketFunc), nil)
 	if avioctx == nil {
 		return errors.New("failed to create avio context")
 	}
