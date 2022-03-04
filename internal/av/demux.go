@@ -49,18 +49,18 @@ func goReadPacketFunc(opaque unsafe.Pointer, buf *C.uint8_t, bufsize C.int) C.in
 		} else {
 			zap.L().Error("failed to read RTP packet", zap.Error(err))
 		}
-		return C.int(0)
+		return C.int(-1)
 	}
 
 	b, err := p.Marshal()
 	if err != nil {
 		zap.L().Error("failed to marshal RTP packet", zap.Error(err))
-		return C.int(0)
+		return C.int(-1)
 	}
 
 	if C.int(len(b)) > bufsize {
 		zap.L().Error("RTP packet too large", zap.Int("size", len(b)))
-		return C.int(0)
+		return C.int(-1)
 	}
 
 	C.memcpy(unsafe.Pointer(buf), unsafe.Pointer(&b[0]), C.ulong(len(b)))
