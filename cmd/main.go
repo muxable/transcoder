@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"github.com/blendle/zapdriver"
-	"github.com/muxable/transcoder/internal/av"
+	"github.com/muxable/transcoder/pkg/av"
 	"github.com/pion/rtp"
 	"github.com/pion/webrtc/v3"
 	"go.uber.org/zap"

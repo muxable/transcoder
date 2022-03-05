@@ -44,7 +44,7 @@ func NewMuxer(codec webrtc.RTPCodecCapability, encoder *EncodeContext) *MuxConte
 	}
 	go func() {
 		defer close(c.pch)
-		defer C.avformat_write_trailer(c.avformatctx)
+		defer C.av_write_trailer(c.avformatctx)
 		if err := c.init(); err != nil {
 			c.pch <- &result{e: err}
 			return
